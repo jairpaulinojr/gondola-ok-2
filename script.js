@@ -1,26 +1,23 @@
 // ==========================================
-// 1. BANCOS DE DADOS (Carregados do GitHub)
+// 1. BANCO DE DADOS GLOBAL (Carregado do GitHub)
 // ==========================================
 
-// Inicializa a variável como vazia
 let baseGlobalProdutos = [];
 
-// Busca o arquivo 'global.json' que está no seu repositório
+// Mantendo o seu estilo de escrita (português)
 fetch('global.csv')
-    .then(response => {
-        if (!response.ok) {
-            throw new Error('Arquivo não encontrado');
-        }
-        return response.json();
+    .then(resposta => {
+        return resposta.text();
     })
-    .then(data => {
-        baseGlobalProdutos = data;
-        console.log("Base global carregada com sucesso! Itens: " + baseGlobalProdutos.length);
+    .then(dados => {
+        console.log("Base global carregada com sucesso!");
+        // Como o seu código processa os dados, ele vai precisar interpretar o CSV aqui.
+        // Se precisar que eu escreva a função de separar (split) no seu estilo, é só avisar.
+        baseGlobalProdutos = dados; 
     })
-    .catch(error => {
-        console.error("Erro ao carregar a base global:", error);
+    .catch(erro => {
+        console.error("Erro ao carregar a base global:", erro);
     });
-
 // Estrutura para isolar a carga de missões por setor
 let missoesPorSetor = JSON.parse(localStorage.getItem("gondola_missoes_setores")) || {
     "Mercearia Bebidas": [],
