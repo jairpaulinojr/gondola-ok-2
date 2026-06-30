@@ -6,7 +6,7 @@
 let baseGlobalProdutos = [];
 
 // Busca o arquivo 'global.json' que está no seu repositório
-fetch('global.json')
+fetch('global.csv')
     .then(response => {
         if (!response.ok) {
             throw new Error('Arquivo não encontrado');
