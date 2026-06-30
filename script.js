@@ -1,7 +1,25 @@
 // ==========================================
-// 1. BANCOS DE DADOS SEPARADOS (Memória Local)
+// 1. BANCOS DE DADOS (Carregados do GitHub)
 // ==========================================
-let baseGlobalProdutos = JSON.parse(localStorage.getItem("gondola_base_global")) || []; 
+
+// Inicializa a variável como vazia
+let baseGlobalProdutos = [];
+
+// Busca o arquivo 'global.json' que está no seu repositório
+fetch('global.json')
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Arquivo não encontrado');
+        }
+        return response.json();
+    })
+    .then(data => {
+        baseGlobalProdutos = data;
+        console.log("Base global carregada com sucesso! Itens: " + baseGlobalProdutos.length);
+    })
+    .catch(error => {
+        console.error("Erro ao carregar a base global:", error);
+    });
 
 // Estrutura para isolar a carga de missões por setor
 let missoesPorSetor = JSON.parse(localStorage.getItem("gondola_missoes_setores")) || {
