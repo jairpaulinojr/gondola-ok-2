@@ -4,20 +4,36 @@
 
 let baseGlobalProdutos = [];
 
-// Mantendo o seu estilo de escrita (português)
+// Mantendo o seu estilo de escrita
 fetch('global.csv')
     .then(resposta => {
         return resposta.text();
     })
     .then(dados => {
         console.log("Base global carregada com sucesso!");
-        // Como o seu código processa os dados, ele vai precisar interpretar o CSV aqui.
-        // Se precisar que eu escreva a função de separar (split) no seu estilo, é só avisar.
-        baseGlobalProdutos = dados; 
+        
+        // CORREÇÃO: Transformar o texto em uma lista de produtos
+        let linhas = dados.split('\n'); 
+        baseGlobalProdutos = []; // Limpa a variável antes de preencher
+        
+        linhas.forEach(linha => {
+            // Ajuste aqui: se o seu Excel usa ponto e vírgula, mantenha ';'. 
+            // Se usa vírgula, troque por ','
+            let colunas = linha.split(';'); 
+            
+            if (colunas.length >= 2) {
+                baseGlobalProdutos.push({
+                    descricao: colunas[0].trim(),
+                    ean: colunas[1].trim()
+                });
+            }
+        });
+        console.log("Total de produtos processados:", baseGlobalProdutos.length);
     })
     .catch(erro => {
         console.error("Erro ao carregar a base global:", erro);
     });
+
 // Estrutura para isolar a carga de missões por setor
 let missoesPorSetor = JSON.parse(localStorage.getItem("gondola_missoes_setores")) || {
     "Mercearia Bebidas": [],
