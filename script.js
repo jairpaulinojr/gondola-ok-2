@@ -528,7 +528,6 @@ function abrirPainelAdmin() {
     `;
 } // <--- AQUI A FUNÇÃO DE CIMA TERMINA
 
-// A função abaixo agora está FORA, como deve ser:
 function carregarBaseGlobal(inputElement) {
     let arquivo = inputElement.files[0];
     if (!arquivo) return;
@@ -540,16 +539,6 @@ function carregarBaseGlobal(inputElement) {
         let json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
 
         let baseProcessada = json.map(item => ({
-            descricao: item.DESCRICAO,
-            codigo: item.CODIGO
-        }));
-        
-        // Salva no LocalStorage
-        localStorage.setItem("gondola_base_global", JSON.stringify(baseProcessada));
-        alert("Base atualizada com sucesso!");
-    };
-    leitor.readAsArrayBuffer(arquivo);
-}
             codigo: String(item["codigo"] || item["Cód. de Barras"] || item["Código"] || "").trim(),
             descricao: String(item["descricao"] || item["DESCRIÇÃO"] || item["Descrição"] || "").trim()
         })).filter(p => p.codigo !== "");
