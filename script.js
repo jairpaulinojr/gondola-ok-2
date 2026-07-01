@@ -487,7 +487,7 @@ function abrirPainelAdmin() {
             <input type="file" onchange="carregarBaseGlobal(this)" style="width:100%; font-size:11px;">
         </div>
     `;
-
+}
     container.innerHTML = `
         ${avisoHtml}
 
