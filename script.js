@@ -1,78 +1,143 @@
 // ==========================================
-// 1. BANCO DE DADOS GLOBAL (Carregado do GitHub)
+// 1. BANCO DE DADOS GLOBAL
 // ==========================================
-
-let baseGlobalProdutos = [];
-
-// Mantendo o seu estilo de escrita
 let baseGlobalProdutos = [];
 
 fetch('global.csv')
     .then(resposta => resposta.text())
     .then(dados => {
-        console.log("Base global carregada com sucesso!");
-        
-        // CORREÇÃO: Transformar o bloco de texto em uma lista organizada
-        let linhas = dados.split('\n'); // Quebra o arquivo em linhas
-        baseGlobalProdutos = []; 
-        
+        let linhas = dados.split('\n');
+        let tempBase = [];
         linhas.forEach(linha => {
-            // O seu arquivo usa ';' como separador
-            let colunas = linha.split(';'); 
-            
-            // Só adiciona se houver descrição e código de barras
+            let colunas = linha.split(';');
             if (colunas.length >= 2) {
-                baseGlobalProdutos.push({
-                    descricao: colunas[0].trim(),
-                    ean: colunas[1].trim()
-                });
+                tempBase.push({ descricao: colunas[0].trim(), codigo: colunas[1].trim() });
             }
         });
-        
-        console.log("Total de itens processados na memória:", baseGlobalProdutos.length);
+        baseGlobalProdutos = tempBase;
+        try {
+            localStorage.setItem("gondola_base_global", JSON.stringify(baseGlobalProdutos));
+            console.log("Base global carregada e salva!");
+        } catch (e) { console.warn("LocalStorage indisponível"); }
     })
-    .catch(erro => {
-        console.error("Erro ao carregar a base global:", erro);
-    });
-        let linhas = dados.split('\n'); 
-        baseGlobalProdutos = []; // Limpa a variável antes de preencher
-        
-        linhas.forEach(linha => {
-            // Ajuste aqui: se o seu Excel usa ponto e vírgula, mantenha ';'. 
-            // Se usa vírgula, troque por ','
-            let colunas = linha.split(';'); 
-            
-            if (colunas.length >= 2) {
-                baseGlobalProdutos.push({
-                    descricao: colunas[0].trim(),
-                    ean: colunas[1].trim()
-                });
-            }
-        });
-        console.log("Total de produtos processados:", baseGlobalProdutos.length);
-    })
-    .catch(erro => {
-        console.error("Erro ao carregar a base global:", erro);
-    });
+    .catch(erro => console.error("Erro ao carregar a base global:", erro));
 
-// Estrutura para isolar a carga de missões por setor
-let missoesPorSetor = JSON.parse(localStorage.getItem("gondola_missoes_setores")) || {
-    "Mercearia Bebidas": [],
-    "Mercearia Doce": [],
-    "Mercearia Conservas": [],
-    "Mercearia Alto Giro": [],
-    "Mercearia Limpeza": [],
-    "Frios Iogurte": [],
-    "Frios Congelados": [],
-    "Açougue": [],
-    "Padaria": []
-};
-
-let produtosDoDia = [];        
+let missoesPorSetor = JSON.parse(localStorage.getItem("gondola_missoes_setores") || "{}");
+let produtosDoDia = [];
 let usuarioAtual = "";
 let setorSelecionado = "";
 let indiceAtual = 0;
 let html5QrcodeScanner = null;
+
+// ==========================================
+// 1.5 a 15: FUNÇÕES DO SISTEMA
+// ==========================================
+
+function exportarParaExcel(nomeArquivo, chaveLocalStorage) {
+    let dados = JSON.parse(localStorage.getItem(chaveLocalStorage)) || [];
+    if (dados.length === 0) { alert("Nenhum dado disponível!"); return; }
+    let ws = XLSX.utils.json_to_sheet(dados);
+    let wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Dados");
+    XLSX.writeFile(wb, nomeArquivo + ".xlsx");
+}
+
+function carregarPlanilhaSetor(inputElement, nomeSetor) {
+    let arquivo = inputElement.files[0];
+    if (!arquivo) return;
+    let leitor = new FileReader();
+    leitor.onload = function(evento) {
+        let dados = new Uint8Array(evento.target.result);
+        let arquivoExcel = XLSX.read(dados, {type: 'array'});
+        let json = XLSX.utils.sheet_to_json(arquivoExcel.Sheets[arquivoExcel.SheetNames[0]]);
+        missoesPorSetor[nomeSetor] = json.map((item, idx) => ({
+            id: Date.now() + idx, 
+            codigo: String(item["Cód. de Barras"] || item["codigo"] || item["Código"] || item["Codigo"] || "").trim(),
+            descricao: String(item["DESCRIÇÃO"] || item["descricao"] || item["Descrição"] || item["Descricao"] || "").trim(),
+            setor: nomeSetor, abastecido: null, precificado: null, statusRuptura: false, finalizacaoGerente: null
+        })).filter(p => p.codigo !== "" && p.descricao !== "");
+        localStorage.setItem("gondola_missoes_setores", JSON.stringify(missoesPorSetor));
+        alert(`Sucesso: ${missoesPorSetor[nomeSetor].length} itens carregados.`);
+        abrirPainelAdmin(); 
+    };
+    leitor.readAsArrayBuffer(arquivo);
+}
+
+function entrar() {
+    let nome = document.getElementById("nome").value.trim();
+    let matricula = document.getElementById("matricula").value.trim().toLowerCase();
+    if (nome === "" || matricula === "") { alert("Preencha Nome e Matrícula."); return; }
+    if (matricula === "admin" || nome.toLowerCase() === "admin") { usuarioAtual = "Administrador"; abrirPainelAdmin(); return; } 
+    usuarioAtual = nome;
+    voltarMenuPrincipal();
+}
+
+function mostrarTelaLoginInicial() {
+    document.querySelector(".container").innerHTML = `
+        <div class="topo"><h1>🛒 GÔNDOLA OK</h1><p>Faça seu login</p></div>
+        <div class="login">
+            <input type="text" id="nome" placeholder="Nome completo">
+            <input type="password" id="matricula" placeholder="Matrícula">
+            <button onclick="entrar()" style="background:#28a745; color:white;">Entrar</button>
+        </div>`;
+}
+
+function abrirPainelAdmin() {
+    let registros = JSON.parse(localStorage.getItem("registro_validades")) || [];
+    let hoje = new Date();
+    let vencendoLogo = registros.filter(r => {
+        if (r.status === "Resolvido" || !r.dataValidade) return false;
+        let [d, m, a] = r.dataValidade.split('/');
+        let dataVenc = new Date(a, m - 1, d);
+        return Math.ceil((dataVenc - hoje) / (1000 * 60 * 60 * 24)) <= 15;
+    });
+    
+    document.querySelector(".container").innerHTML = `
+        ${vencendoLogo.length > 0 ? `<div style="background:#dc3545; color:white; padding:15px; text-align:center;">🚨 ${vencendoLogo.length} itens vencendo!</div>` : ""}
+        <div class="topo"><h1>⚙️ PAINEL DO ADMINISTRADOR</h1></div>
+        <div class="login">
+            <button onclick="abrirMenuSetoresGerente()">🔑 Auditorias</button>
+            <button onclick="abrirRelatorioValidadesGerente()">📅 Ver Validades</button>
+            <button onclick="location.reload()">Sair</button>
+        </div>`;
+}
+
+function voltarMenuPrincipal() {
+    document.querySelector(".container").innerHTML = `
+        <div class="topo"><h1>🛒 GÔNDOLA OK</h1><p>Operador: <strong>${usuarioAtual}</strong></p></div>
+        <div class="login">
+            <button onclick="prepararMissaoSetor('Mercearia Bebidas')">🥤 Mercearia Bebidas</button>
+            <button onclick="abrirAbaValidade()" style="background:#20c997; color:white;">📅 Verificar Validade</button>
+            <button onclick="abrirAbaEtiquetas()" style="background:#ffc107;">🏷️ Etiquetas</button>
+        </div>`;
+}
+
+function buscarProdutoValidade(codigoBarras) {
+    let baseMestre = JSON.parse(localStorage.getItem("gondola_base_global") || "[]");
+    let produtoEncontrado = baseMestre.find(p => p.codigo === codigoBarras.trim());
+    let display = document.getElementById("resultado-validade");
+    display.style.display = "block";
+    if (!produtoEncontrado) { display.innerHTML = "❌ Produto não localizado."; return; }
+    display.innerHTML = `
+        <p><strong>${produtoEncontrado.descricao}</strong></p>
+        <input type="date" id="data-venc"> <input type="number" id="qtd-venc" value="1">
+        <button onclick="salvarDataValidade('${produtoEncontrado.codigo}', '${produtoEncontrado.descricao.replace(/'/g, "\\'")}')">Salvar</button>`;
+}
+
+function salvarDataValidade(codigo, descricao) {
+    let data = document.getElementById("data-venc").value;
+    let qtd = document.getElementById("qtd-venc").value;
+    if(!data) return alert("Escolha uma data!");
+    let registros = JSON.parse(localStorage.getItem("registro_validades") || "[]");
+    let [a, m, d] = data.split("-");
+    registros.push({ codigo, descricao, dataValidade: `${d}/${m}/${a}`, quantidade: qtd, status: "Pendente" });
+    localStorage.setItem("registro_validades", JSON.stringify(registros));
+    alert("Salvo!");
+    abrirAbaValidade();
+}
+
+// Inicialização
+window.onload = mostrarTelaLoginInicial;
 // ==========================================
 // 1.5. FUNÇÃO DE EXPORTAÇÃO (UTILS)
 // ==========================================
@@ -820,7 +885,31 @@ window.gerarEtiquetasCodigoBarras = function(lista) {
 };
 
 }
+// ==========================================
+// CORREÇÃO: Função buscarProdutoValidade (Garanta que esteja assim)
+// ==========================================
+function buscarProdutoValidade(codigoBarras) {
+    // Tenta pegar do localStorage, se falhar, usa a variável global baseGlobalProdutos
+    let baseMestre = JSON.parse(localStorage.getItem("gondola_base_global") || "[]");
+    if (baseMestre.length === 0) baseMestre = baseGlobalProdutos; 
+    
+    let produtoEncontrado = baseMestre.find(p => p.codigo === codigoBarras.trim());
+    
+    let display = document.getElementById("resultado-validade"); 
+    if(!display) return;
+    
+    display.style.display = "block"; 
+    if (!produtoEncontrado) { 
+        display.innerHTML = <p style="color:red; text-align:center;">❌ Produto não localizado no Cadastro Mestre Global Mensal.</p>; 
+        return; 
+    } 
+    display.innerHTML = ` <p><strong>Produto:</strong> ${produtoEncontrado.descricao}</p> <p><strong>Código:</strong> ${produtoEncontrado.codigo}</p> <label><strong>Data de Vencimento:</strong></label> <input type="date" id="data-venc" style="width:100%; padding:8px; margin: 10px 0;"> <label><strong>Quantidade:</strong></label> <input type="number" id="qtd-venc" value="1" style="width:100%; padding:8px; margin: 10px 0;"> <button onclick="salvarDataValidade('${produtoEncontrado.codigo}', '${produtoEncontrado.descricao.replace(/'/g, "\\'")}')" style="background:#28a745; color:white; width:100%;">Salvar Data e Qtd</button> `; 
+}
+
+// EXECUÇÃO INICIAL MANDATÓRIA AO CARREGAR A PÁGINA
+window.onload = mostrarTelaLoginInicial;
 
 
 // EXECUÇÃO INICIAL MANDATÓRIA AO CARREGAR A PÁGINA
 mostrarTelaLoginInicial();
+
