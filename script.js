@@ -510,11 +510,25 @@ function abrirPainelAdmin() {
             </button>
         </div>
     `;
-}// ... (Código da função anterior, ex: abrirPainelAdmin)
+
 function abrirPainelAdmin() {
+    let container = document.querySelector(".container");
+    if (!container) return;
 
-} 
+    // --- AQUI VAI O HTML DO SEU PAINEL ---
+    container.innerHTML = `
+        <div class="topo"><h1>⚙️ PAINEL ADMINISTRADOR</h1></div>
+        <div class="login">
+            <div style="margin-top:20px; padding:15px; background:#fff3cd; border:2px dashed #ffc107; border-radius:8px;">
+                <label style="font-weight:bold; color:#856404;">🔥 ATUALIZAR BASE GLOBAL</label>
+                <input type="file" onchange="carregarBaseGlobal(this)" style="width:100%; margin-top:5px;">
+            </div>
+            <button onclick="location.reload()" style="margin-top:15px;">Sair</button>
+        </div>
+    `;
+} // <--- AQUI A FUNÇÃO DE CIMA TERMINA
 
+// A função abaixo agora está FORA, como deve ser:
 function carregarBaseGlobal(inputElement) {
     let arquivo = inputElement.files[0];
     if (!arquivo) return;
@@ -526,6 +540,16 @@ function carregarBaseGlobal(inputElement) {
         let json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
 
         let baseProcessada = json.map(item => ({
+            descricao: item.DESCRICAO,
+            codigo: item.CODIGO
+        }));
+        
+        // Salva no LocalStorage
+        localStorage.setItem("gondola_base_global", JSON.stringify(baseProcessada));
+        alert("Base atualizada com sucesso!");
+    };
+    leitor.readAsArrayBuffer(arquivo);
+}
             codigo: String(item["codigo"] || item["Cód. de Barras"] || item["Código"] || "").trim(),
             descricao: String(item["descricao"] || item["DESCRIÇÃO"] || item["Descrição"] || "").trim()
         })).filter(p => p.codigo !== "");
