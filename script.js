@@ -433,11 +433,10 @@ function abrirPainelAdmin() {
     let container = document.querySelector(".container");
     if (!container) return;
 
-    // 1. LÓGICA: O alerta só some quando o status for "Resolvido"
+    // LÓGICA DE AVISOS (Itens vencendo)
     let registros = JSON.parse(localStorage.getItem("registro_validades")) || [];
     let hoje = new Date();
 
-    // Filtra itens que NÃO foram "Resolvidos" e vencem em até 15 dias
     let vencendoLogo = registros.filter(r => {
         if (r.status === "Resolvido") return false;
         if (!r.dataValidade) return false;
@@ -471,10 +470,8 @@ function abrirPainelAdmin() {
     ];
 
     let blocosInputsSetores = "";
-
     setoresLista.forEach(s => {
         let contagem = missoesPorSetor[s.nome] ? missoesPorSetor[s.nome].length : 0;
-
         blocosInputsSetores += `
             <div style="margin-bottom:12px;border-bottom:1px solid #f0f0f0;padding-bottom:8px;">
                 <label><strong>${s.icone} ${s.nome}</strong> (${contagem} itens)</label>
@@ -482,6 +479,14 @@ function abrirPainelAdmin() {
             </div>
         `;
     });
+
+    // Novo bloco da Base Global
+    let blocoBaseGlobal = `
+        <div style="margin-top:25px; padding:15px; background:#fff3cd; border:2px dashed #ffc107; border-radius:8px;">
+            <label style="font-weight:bold; color:#856404; display:block; margin-bottom:8px;">🔥 ATUALIZAR BASE GLOBAL (MASTER)</label>
+            <input type="file" onchange="carregarBaseGlobal(this)" style="width:100%; font-size:11px;">
+        </div>
+    `;
 
     container.innerHTML = `
         ${avisoHtml}
@@ -492,17 +497,43 @@ function abrirPainelAdmin() {
 
         <div class="login" style="text-align:left;max-width:100%;">
             <div style="display:flex;gap:10px;margin-bottom:15px;">
-                <button onclick="abrirMenuSetoresGerente()" style="background:#17a2b8;color:white;width:50%;">🔑 Auditorias</button>
-                <button onclick="abrirRelatorioValidadesGerente()" style="background:#20c997;color:white;width:50%;">📅 Ver Validades</button>
+                <button onclick="abrirMenuSetoresGerente()" style="background:#17a2b8;color:white;width:50%;padding:10px;border:none;border-radius:4px;">🔑 Auditorias</button>
+                <button onclick="abrirRelatorioValidadesGerente()" style="background:#20c997;color:white;width:50%;padding:10px;border:none;border-radius:4px;">📅 Ver Validades</button>
             </div>
 
             ${blocosInputsSetores}
+            
+            ${blocoBaseGlobal}
 
-            <button onclick="location.reload()" style="background:#6c757d;color:white;width:100%;margin-top:10px;">
+            <button onclick="location.reload()" style="background:#6c757d;color:white;width:100%;margin-top:20px;padding:10px;border:none;border-radius:4px;">
                 Sair
             </button>
         </div>
     `;
+}// ... (Código da função anterior, ex: abrirPainelAdmin)
+function abrirPainelAdmin() {
+
+} 
+
+function carregarBaseGlobal(inputElement) {
+    let arquivo = inputElement.files[0];
+    if (!arquivo) return;
+
+    let leitor = new FileReader();
+    leitor.onload = function(evento) {
+        let dados = new Uint8Array(evento.target.result);
+        let wb = XLSX.read(dados, {type: "array"});
+        let json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+
+        let baseProcessada = json.map(item => ({
+            codigo: String(item["codigo"] || item["Cód. de Barras"] || item["Código"] || "").trim(),
+            descricao: String(item["descricao"] || item["DESCRIÇÃO"] || item["Descrição"] || "").trim()
+        })).filter(p => p.codigo !== "");
+
+        localStorage.setItem("gondola_base_global", JSON.stringify(baseProcessada));
+        alert("Sucesso! Base Global atualizada com " + baseProcessada.length + " itens.");
+    };
+    leitor.readAsArrayBuffer(arquivo);
 }
 // ==========================================
 // 5. MENU PRINCIPAL DO REPOSITOR (USUÁRIO)
