@@ -247,16 +247,24 @@ function salvarDataValidade(codigo, descricao) {
 // Inicialização
 window.addEventListener("load", mostrarTelaLoginInicial);
 // ==========================================
-// 1.5. FUNÇÃO DE EXPORTAÇÃO (UTILS)
+// 1.5. FUNÇÃO DE EXPORTAÇÃO (CORRIGIDA)
 // ==========================================
+function exportarParaExcel(nomeArquivo, chaveLocalStorage) {
+    // Agora a função busca os dados usando a chave que você passar
+    let dados = JSON.parse(localStorage.getItem(chaveLocalStorage)) || [];
+    
+    if (dados.length === 0) {
+        alert("Nenhum dado disponível para exportar!");
+        return;
+    }
 
-    // Cria a planilha a partir dos dados do LocalStorage
     let ws = XLSX.utils.json_to_sheet(dados);
     let wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Dados");
 
     // Baixa o arquivo
     XLSX.writeFile(wb, nomeArquivo + ".xlsx");
+}
 
 // ==========================================
 // 2. PROCESSADOR DE CARGA DE EXCEL POR SETOR
