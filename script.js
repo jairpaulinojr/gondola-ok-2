@@ -21,6 +21,7 @@ let usuarioAtual = "";
 let setorSelecionado = "";
 let indiceAtual = 0;
 let html5QrcodeScanner = null;
+
 // ==========================================
 // 1.5. FUNÇÃO DE EXPORTAÇÃO (UTILS)
 // ==========================================
@@ -31,14 +32,12 @@ function exportarParaExcel(nomeArquivo, chaveLocalStorage) {
         return;
     }
 
-    // Cria a planilha a partir dos dados do LocalStorage
     let ws = XLSX.utils.json_to_sheet(dados);
     let wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Dados");
-    
-    // Baixa o arquivo
     XLSX.writeFile(wb, nomeArquivo + ".xlsx");
 }
+
 // ==========================================
 // 2. PROCESSADOR DE CARGA DE EXCEL POR SETOR
 // ==========================================
@@ -104,6 +103,57 @@ function carregarBaseGlobal(inputElement) {
 }
 
 // ==========================================
+// 2.5. CARREGAR CONFIGURAÇÃO DO CHECKLIST
+// ==========================================
+function carregarConfigChecklist(input) {
+    if (!input.files || input.files.length === 0) return;
+    
+    let file = input.files[0];
+    let reader = new FileReader();
+    
+    reader.onload = function(e) {
+        try {
+            let data = new Uint8Array(e.target.result);
+            let workbook = XLSX.read(data, { type: 'array' });
+            let firstSheetName = workbook.SheetNames[0];
+            let worksheet = workbook.Sheets[firstSheetName];
+            let linhas = XLSX.utils.sheet_to_json(worksheet);
+            
+            if (linhas.length === 0) {
+                alert("⚠️ A planilha de checklist está vazia!");
+                return;
+            }
+            
+            let perguntasFormatadas = [];
+            linhas.forEach((linha, index) => {
+                let setorNome = linha["SETOR"] || linha["setor"];
+                let perguntaTexto = linha["PERGUNTA"] || linha["pergunta"];
+                let ehDiariaRaw = linha["DIARIA"] || linha["diaria"] || "NÃO";
+                
+                if (setorNome && perguntaTexto) {
+                    let ehDiaria = String(ehDiariaRaw).trim().toUpperCase() === "SIM";
+                    perguntasFormatadas.push({
+                        id: Date.now() + index,
+                        setor: String(setorNome).trim(),
+                        pergunta: String(perguntaTexto).trim(),
+                        diaria: ehDiaria
+                    });
+                }
+            });
+            
+            localStorage.setItem("gondola_checklist_config", JSON.stringify(perguntasFormatadas));
+            alert(`✅ Sucesso! ${perguntasFormatadas.length} perguntas de checklist foram importadas.`);
+            abrirPainelAdmin();
+            
+        } catch (err) {
+            console.error(err);
+            alert("❌ Erro ao ler o arquivo Excel.");
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+// ==========================================
 // 3. FUNÇÃO DE LOGIN
 // ==========================================
 function entrar() {
@@ -153,19 +203,16 @@ function mostrarTelaLoginInicial() {
         </div>
     `;
 }
+
 // ==========================================
-// 4. TELA DO ADMINISTRADOR (ATUALIZADA)
+// 4. TELA DO ADMINISTRADOR
 // ==========================================
 function abrirPainelAdmin() {
-    // 1. LÓGICA: O alerta só some quando o status for "Resolvido"
     let registros = JSON.parse(localStorage.getItem("registro_validades")) || [];
     let hoje = new Date();
     
-    // Filtra itens que NÃO foram "Resolvidos" e vencem em até 15 dias
     let vencendoLogo = registros.filter(r => {
         if (r.status === "Resolvido") return false;
-        
-        // Verifica se a data é válida antes de processar
         if (!r.dataValidade) return false;
         
         let [d, m, a] = r.dataValidade.split('/');
@@ -194,7 +241,15 @@ function abrirPainelAdmin() {
 
     let blocosInputsSetores = "";
     setoresLista.forEach(s => {
-        let contagem = missoesPorSetor[s.nome] ? missoesPorSetor[s.nome].length : 0;
+        let contagem = 0;
+        try {
+            if (typeof missoesPorSetor !== 'undefined' && missoesPorSetor[s.nome]) {
+                contagem = missoesPorSetor[s.nome].length;
+            }
+        } catch(e) {
+            contagem = 0;
+        }
+
         blocosInputsSetores += `
             <div style="margin-bottom: 12px; border-bottom: 1px solid #f0f0f0; padding-bottom: 8px;">
                 <label><strong>${s.icone} ${s.nome}</strong> (${contagem} itens)</label>
@@ -203,7 +258,6 @@ function abrirPainelAdmin() {
         `;
     });
 
-    // Bloco da Base Global inserido abaixo dos setores
     let blocoBaseGlobal = `
         <div style="margin-top: 15px; padding: 10px; background: #fff3cd; border: 1px dashed #ffc107; border-radius: 5px;">
             <label style="font-weight: bold; color: #856404;">🔥 ATUALIZAR BASE GLOBAL</label>
@@ -211,19 +265,31 @@ function abrirPainelAdmin() {
         </div>
     `;
 
-    document.querySelector(".container").innerHTML = `
-        ${avisoHtml}
-        <div class="topo"><h1>⚙️ PAINEL DO ADMINISTRADOR</h1></div>
-        <div class="login" style="text-align: left; max-width: 100%;">
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <button onclick="abrirMenuSetoresGerente()" style="background:#17a2b8; color:white; width:50%;">🔑 Auditorias</button>
-                <button onclick="abrirRelatorioValidadesGerente()" style="background:#20c997; color:white; width:50%;">📅 Ver Validades</button>
-            </div>
-            ${blocosInputsSetores}
-            ${blocoBaseGlobal}
-            <button onclick="location.reload()" style="background:#6c757d; color:white; width: 100%; margin-top: 10px;">Sair</button>
+    let blocoChecklist = `
+        <div style="margin-top:15px; padding:10px; background:#d1ecf1; border:1px dashed #0c5460; border-radius:5px;">
+            <label style="font-weight:bold; color:#0c5460;">📋 ATUALIZAR CONFIGURAÇÃO DE CHECKLISTS</label>
+            <input type="file" onchange="carregarConfigChecklist(this)" style="width:100%; font-size:11px; margin-top: 5px;">
         </div>
     `;
+
+    let container = document.querySelector(".container");
+    if (container) {
+        container.innerHTML = `
+            ${avisoHtml}
+            <div class="topo"><h1>⚙️ PAINEL DO ADMINISTRADOR</h1></div>
+            <div class="login" style="text-align: left; max-width: 100%;">
+                <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                    <button onclick="abrirMenuSetoresGerente()" style="background:#17a2b8; color:white; flex: 1; min-width: 120px;">🔑 Auditorias</button>
+                    <button onclick="abrirRelatorioValidadesGerente()" style="background:#20c997; color:white; flex: 1; min-width: 120px;">📅 Ver Validades</button>
+                    <button onclick="abrirMenuChecklistsGerente()" style="background:#6f42c1; color:white; width: 100%; margin-top: 5px;">📋 Responder Checklists</button>
+                </div>
+                ${blocosInputsSetores}
+                ${blocoBaseGlobal}
+                ${blocoChecklist}
+                <button onclick="location.reload()" style="background:#6c757d; color:white; width: 100%; margin-top: 20px;">Sair</button>
+            </div>
+        `;
+    }
 }
 
 // ==========================================
@@ -255,6 +321,7 @@ function voltarMenuPrincipal() {
             <hr style="margin:20px 0; border:0; border-top:1px solid #ccc;">
             
             <h2>Serviços de Apoio</h2>
+            <button onclick="abrirMenuChecklistsGerente()" style="background:#6f42c1; color:white; margin-bottom: 10px;">📋 Checklist Operacional</button>
             <button onclick="abrirAbaValidade()" style="background:#20c997; color:white;">📅 Verificar Validade (Base Global)</button>
             <button onclick="abrirAbaEtiquetas()" style="background:#ffc107; color:black;">🏷️ Etiquetas Pendentes</button>
             <button onclick="location.reload()" style="background:#6c757d; color:white; margin-top: 15px;">⬅️ Sair do App</button>
@@ -426,8 +493,6 @@ function abrirAbaValidade() {
     }, (erro) => {});
 }
 
-// --- SUBSTITUA APENAS DAQUI PARA BAIXO NO SEU ARQUIVO ---
-
 function buscarProdutoValidade(codigoBarras) {
     let baseMestre = JSON.parse(localStorage.getItem("gondola_base_global")) || [];
     let produtoEncontrado = baseMestre.find(p => p.codigo === codigoBarras.trim());
@@ -453,11 +518,10 @@ function buscarProdutoValidade(codigoBarras) {
 
 function salvarDataValidade(codigo, descricao) {
     let data = document.getElementById("data-venc").value;
-    let qtd = document.getElementById("qtd-venc").value; // Captura o valor do input
+    let qtd = document.getElementById("qtd-venc").value;
     if(!data) { alert("Escolha uma data!"); return; }
     
     let registros = JSON.parse(localStorage.getItem("registro_validades")) || [];
-    
     let partes = data.split("-");
     let dataFormatada = `${partes[2]}/${partes[1]}/${partes[0]}`;
 
@@ -465,8 +529,8 @@ function salvarDataValidade(codigo, descricao) {
         codigo: codigo, 
         descricao: descricao,
         dataValidade: dataFormatada,
-        quantidade: qtd, // Salva o número digitado
-        status: "Pendente", // Incluído para o filtro do Gerente reconhecer o item
+        quantidade: qtd, 
+        status: "Pendente", 
         dataRegistro: new Date().toLocaleDateString() 
     });
     localStorage.setItem("registro_validades", JSON.stringify(registros));
@@ -480,13 +544,13 @@ function salvarDataValidade(codigo, descricao) {
 // ==========================================
 function abrirAbaEtiquetas() {
     let etiquetas = JSON.parse(localStorage.getItem("etiquetas_pendentes")) || [];
-    let linhas = "";
+    let lines = "";
 
     if (etiquetas.length === 0) {
-        linhas = `<tr><td colspan="2" style="text-align:center; padding:20px; color: green; font-weight: bold;">🎉 Nenhum produto sem preço pendente!</td></tr>`;
+        lines = `<tr><td colspan="2" style="text-align:center; padding:20px; color: green; font-weight: bold;">🎉 Nenhum produto sem preço pendente!</td></tr>`;
     } else {
         etiquetas.forEach((e, idx) => {
-            linhas += `
+            lines += `
                 <tr style="border-bottom: 1px solid #ddd;">
                     <td style="padding:12px; font-size:14px; line-height: 1.4;">
                         <strong>${e.descricao}</strong><br>
@@ -521,7 +585,7 @@ function abrirAbaEtiquetas() {
                         <th style="padding:10px; text-align:center; font-size: 13px;">Ação</th>
                     </tr>
                 </thead>
-                <tbody>${linhas}</tbody>
+                <tbody>${lines}</tbody>
             </table>
             <br>
             <button onclick="voltarMenuPrincipal()" style="background:#6c757d; color:white; width:100%;">⬅️ Voltar ao Menu</button>
@@ -548,7 +612,6 @@ function abrirRelatorioValidadesGerente() {
         let estiloTratado = r.status === "Tratado" ? "background:#e8f4fd;" : "background:#ffffff;";
         let qtd = r.quantidade || 1; 
 
-        // Em vez de colocar a lógica no onclick, chamamos uma função que lê os dados da linha
         linhas += `
             <tr style="${estiloTratado} border-bottom: 1px solid #ddd; font-size: 13px;">
                 <td style="padding: 10px;"><strong>${r.descricao}</strong><br><small>Cód: ${r.codigo}</small></td>
@@ -575,15 +638,11 @@ function abrirRelatorioValidadesGerente() {
     `;
 }
 
-// NOVA FUNÇÃO "PONTE" PARA EVITAR ERROS DE SINTAXE NO HTML
 function executarAcao(codigo, data, status) {
     console.log("Tentando atualizar:", codigo, data, status);
     atualizarStatus(codigo, data, status);
 }
 
-// ==========================================
-// 11.5. FUNÇÃO GLOBAL (GARANTIA DE FUNCIONAMENTO)
-// ==========================================
 window.atualizarStatus = function(codigo, dataValidade, novoStatus) {
     let registros = JSON.parse(localStorage.getItem("registro_validades")) || [];
     let item = registros.find(r => r.codigo === codigo && r.dataValidade === dataValidade);
@@ -596,7 +655,7 @@ window.atualizarStatus = function(codigo, dataValidade, novoStatus) {
     } else {
         alert("Erro ao localizar item.");
     }
-}
+};
 
 // ==========================================
 // 12. GERENTE: SELEÇÃO DE ABAS AUDITORIA
@@ -623,6 +682,7 @@ function abrirMenuSetoresGerente() {
         </div>
     `;
 }
+
 // ==========================================
 // 13. GERENTE: VISUALIZAÇÃO DE RESULTADOS AUDITORIA
 // ==========================================
@@ -685,70 +745,52 @@ function salvarDecisaoGerente(setorOrigem, idProd, motivo) {
     if (item) {
         item.finalizacaoGerente = motivo;
         localStorage.setItem("gondola_dados", JSON.stringify(dados));
-        // Recarrega a tela para manter o select selecionado
         abrirAbaGerente(setorOrigem);
-    
     }
-// ==========================================
-// 14. GESTOR: LISTA DE ETIQUETAS PENDENTES
-// ==========================================
-function abrirGestaoEtiquetas() {
-    let etiquetas = JSON.parse(localStorage.getItem("etiquetas_pendentes")) || [];
-    let linhas = "";
-
-    if (etiquetas.length === 0) {
-        linhas = `<tr><td colspan="2" style="padding:15px; text-align:center; color:#666;">Nenhuma etiqueta pendente!</td></tr>`;
-    } else {
-        etiquetas.forEach((e, index) => {
-            linhas += `
-                <tr style="border-bottom: 1px solid #ddd; font-size: 13px;">
-                    <td style="padding: 10px;">
-                        <strong>${e.descricao}</strong><br>
-                        <small style="color:#666;">Cód: ${e.codigo}</small>
-                    </td>
-                    <td style="padding: 10px; text-align:center;">
-                        <button onclick="removerEtiqueta(${index})" style="background:#28a745; color:white; border:none; padding:6px; border-radius:3px; cursor:pointer;">Resolvido</button>
-                    </td>
-                </tr>
-            `;
-        });
-    }
-
-    document.querySelector(".container").innerHTML = `
-        <div class="topo">
-            <h1>🏷️ LISTA DE PRECIFICAÇÃO</h1>
-            <p>Itens sem etiqueta na gôndola</p>
-        </div>
-        <div class="login" style="max-width: 100%; padding: 10px;">
-            <button onclick="gerarEtiquetasCodigoBarras(JSON.parse(localStorage.getItem('etiquetas_pendentes')))" 
-                    style="background:#007bff; color:white; width:100%; margin-bottom:10px; padding:12px; font-weight:bold; border:none; border-radius:3px; cursor:pointer;">
-                🖨️ Imprimir Etiquetas
-            </button>
-            
-            <table style="width: 100%; border-collapse: collapse; background:white; margin-bottom:15px;">
-                <tr style="background:#f2f2f2; font-size:12px;">
-                    <th style="padding:8px;">Produto</th>
-                    <th style="padding:8px; text-align:center;">Ação</th>
-                </tr>
-                ${linhas}
-            </table>
-            
-            <button onclick="abrirMenuSetoresGerente()" style="background-color: #6c757d; color: white; width: 100%; padding:10px;">⬅️ Voltar ao Menu</button>
-        </div>
-    `;
 }
 
-function removerEtiqueta(index) {
-    let etiquetas = JSON.parse(localStorage.getItem("etiquetas_pendentes")) || [];
-    etiquetas.splice(index, 1);
-    localStorage.setItem("etiquetas_pendentes", JSON.stringify(etiquetas));
-    abrirGestaoEtiquetas();
+// ==========================================
+// 14. GERENTE: MENU EXCLUSIVO DE CHECKLISTS
+// ==========================================
+function abrirMenuChecklistsGerente() {
+    let container = document.querySelector(".container");
+    if (!container) return;
+
+    let setoresChecklist = [
+        { nome: "Área externa da loja", icone: "🏪" },
+        { nome: "Frente de caixas", icone: "🛒" },
+        { nome: "Promoção e gestão comercial", icone: "🏷️" },
+        { nome: "Recepção de mercadoria", icone: "🚚" },
+        { nome: "Depósito", icone: "📦" },
+        { nome: "Flv", icone: "🍉" },
+        { nome: "Açougue", icone: "🥩" },
+        { nome: "Frios e lacticínios", icone: "🧀" },
+        { nome: "Padaria", icone: "🍞" },
+        { nome: "Mercearia", icone: "🥫" }
+    ];
+
+    let botoesHtml = "";
+    setoresChecklist.forEach(setor => {
+        botoesHtml += `
+            <button onclick="abrirChecklistSetor('${setor.nome}')" style="background: #ffffff; color: #333; border: 1px solid #ced4da; border-left: 5px solid #6f42c1; width: 100%; margin-bottom: 8px; text-align: left; padding: 12px; font-weight: bold; border-radius: 4px; display: flex; gap: 10px; align-items: center;">
+                <span>${setor.icone}</span> ${setor.nome}
+            </button>
+        `;
+    });
+
+    container.innerHTML = `
+        <div class="topo"><h1>📋 SELECIONE A ÁREA DO CHECKLIST</h1></div>
+        <div class="login" style="text-align: left; max-width: 100%; max-height: 75vh; overflow-y: auto;">
+            <p style="font-size: 13px; color: #6c757d; margin-bottom: 15px; text-align: center;">Selecione um setor abaixo para responder o questionário.</p>
+            ${botoesHtml}
+            <button onclick="location.reload()" style="background:#6c757d; color:white; width: 100%; margin-top: 15px;">Voltar</button>
+        </div>
+    `;
 }
 
 // ==========================================
 // 15. ENGINE DE IMPRESSÃO (JsBarcode)
 // ==========================================
-// Adicione isto exatamente no final do seu script.js
 window.gerarEtiquetasCodigoBarras = function(lista) {
     if (!lista || lista.length === 0) { 
         alert("Nenhum item para imprimir!"); 
@@ -775,8 +817,77 @@ window.gerarEtiquetasCodigoBarras = function(lista) {
     janela.document.close();
 };
 
+// ==========================================
+// 16. CONTROLE DE EXIBIÇÃO DO CHECKLIST
+// ==========================================
+function abrirChecklistSetor(setor) {
+    let todasPerguntas = JSON.parse(localStorage.getItem("gondola_checklist_config")) || [];
+    let perguntasDoSetor = todasPerguntas.filter(p => p.setor.toLowerCase() === setor.toLowerCase());
+
+    let hoje = new Date();
+    let diaDaSemana = hoje.getDay(); 
+    let diaDoChecklistCompleto = 0; // 0 = Domingo
+
+    let perguntasFiltradas = [];
+    let modoVisualizacao = "";
+
+    if (diaDaSemana === diaDoChecklistCompleto) {
+        perguntasFiltradas = perguntasDoSetor;
+        modoVisualizacao = "🔥 COMPLETO DE DOMINGO";
+    } else {
+        perguntasFiltradas = perguntasDoSetor.filter(p => p.diaria === true);
+        modoVisualizacao = "⚡ MISSÃO DIÁRIA RÁPIDA";
+    }
+
+    let container = document.querySelector(".container");
+    if (!container) return;
+
+    if (perguntasFiltradas.length === 0) {
+        container.innerHTML = `
+            <div class="topo"><h1>📋 ${setor}</h1></div>
+            <div class="login" style="text-align: center;">
+                <p style="color: #856404; background: #fff3cd; padding: 10px; border-radius: 5px;">
+                    ⚠️ Nenhuma pergunta ativa para este setor hoje (${modoVisualizacao}).
+                </p>
+                <button onclick="abrirMenuChecklistsGerente()" style="background:#6c757d; color:white; width: 100%; margin-top: 15px;">Voltar</button>
+            </div>
+        `;
+        return;
+    }
+
+    let htmlPerguntas = "";
+    perguntasFiltradas.forEach((p, index) => {
+        htmlPerguntas += `
+            <div style="margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid #e9ecef;">
+                <label style="display: block; margin-bottom: 6px; font-size: 14px;">
+                    <strong>${index + 1}.</strong> ${p.pergunta}
+                </label>
+                <select id="resp-checklist-${p.id}" style="width: 100%; padding: 8px; font-size: 14px; border: 1px solid #ced4da; border-radius: 4px; background: #fff;">
+                    <option value="OK">🟢 OK</option>
+                    <option value="NAO_CONFORME">🔴 Não Conforme</option>
+                    <option value="NA">⚠️ N/A</option>
+                </select>
+                <input type="text" id="obs-checklist-${p.id}" placeholder="Observação (opcional)..." style="width: 100%; padding: 6px; font-size: 12px; margin-top: 5px; border: 1px solid #e9ecef; border-radius: 4px;">
+            </div>
+        `;
+    });
+
+    container.innerHTML = `
+        <div class="topo">
+            <h1>📋 ${setor}</h1>
+            <p style="font-size:11px; margin-top:-5px; color:#fff; opacity:0.8;">Foco de hoje: <strong>${modoVisualizacao}</strong> (${perguntasFiltradas.length} itens)</p>
+        </div>
+        <div class="login" style="text-align: left; max-width: 100%; max-height: 65vh; overflow-y: auto;">
+            ${htmlPerguntas}
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button onclick="salvarRespostasChecklist('${setor}')" style="background:#28a745; color:white; width:50%;">Gravar</button>
+                <button onclick="abrirMenuChecklistsGerente()" style="background:#6c757d; color:white; width:50%;">Voltar</button>
+            </div>
+        </div>
+    `;
 }
 
-
+// ==========================================
 // EXECUÇÃO INICIAL MANDATÓRIA AO CARREGAR A PÁGINA
+// ==========================================
 mostrarTelaLoginInicial();
