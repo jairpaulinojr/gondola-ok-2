@@ -455,7 +455,7 @@ function abrirPainelAdmin() {
                 🚨 ATENÇÃO: ${vencendoLogo.length} item(ns) vencendo em até 15 dias!
             </div>
         `;
-    }
+    
 
     let setoresLista = [
         { nome: "Mercearia Bebidas", icone: "🥤" },
@@ -487,7 +487,7 @@ function abrirPainelAdmin() {
             <input type="file" onchange="carregarBaseGlobal(this)" style="width:100%; font-size:11px;">
         </div>
     `;
-}
+
     container.innerHTML = `
         ${avisoHtml}
 
