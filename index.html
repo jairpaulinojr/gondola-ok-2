@@ -1,90 +1,28 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
-    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gôndola OK - Sistema de Auditoria</title>
+    <title>Gôndola OK</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f9;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-        }
-        .container {
-            width: 100%;
-            max-width: 450px;
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        .topo {
-            text-align: center;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #28a745;
-            padding-bottom: 10px;
-        }
-        .topo h1 { margin: 0; color: #333; font-size: 24px; }
-        .topo p { margin: 5px 0 0 0; color: #666; font-size: 14px; }
-        .login {
-            display: flex;
-            flex-direction: column;
-        }
-        label {
-            font-weight: bold;
-            margin-bottom: 5px;
-            color: #444;
-            font-size: 14px;
-        }
-        input[type="text"], input[type="password"] {
-            padding: 10px;
-            margin-bottom: 15px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 14px;
-            width: 100%;
-            box-sizing: border-box;
-        }
-        button {
-            padding: 12px;
-            border: none;
-            border-radius: 4px;
-            font-size: 14px;
-            cursor: pointer;
-            font-weight: bold;
-            background-color: #28a745;
-            color: white;
-            width: 100%;
-        }
-        button:hover { opacity: 0.9; }
+        /* Estilos básicos para o app funcionar */
+        body { font-family: sans-serif; padding: 10px; background: #f4f4f4; }
+        .container { max-width: 400px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        .topo { text-align: center; margin-bottom: 20px; }
+        .login input { width: 100%; padding: 10px; margin: 5px 0; box-sizing: border-box; }
+        .login button { width: 100%; padding: 10px; margin-top: 10px; cursor: pointer; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <div class="topo">
-            <h1>🛒 GÔNDOLA OK</h1>
-            <p>Faça seu login para iniciar</p>
         </div>
 
-        <div class="login">
-            <label for="nome">Nome do Colaborador:</label>
-            <input type="text" id="nome" placeholder="Digite seu nome completo">
-
-            <label for="matricula">Matrícula / Senha:</label>
-            <input type="password" id="matricula" placeholder="Digite sua matrícula (ou 'admin')">
-
-            <button onclick="entrar()">Entrar no Sistema</button>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
 
     <script src="script.js"></script>
+
 </body>
 </html>
+
