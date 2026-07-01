@@ -257,7 +257,7 @@ window.addEventListener("load", mostrarTelaLoginInicial);
 
     // Baixa o arquivo
     XLSX.writeFile(wb, nomeArquivo + ".xlsx");
-}
+
 // ==========================================
 // 2. PROCESSADOR DE CARGA DE EXCEL POR SETOR
 // ==========================================
