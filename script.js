@@ -5,14 +5,35 @@
 let baseGlobalProdutos = [];
 
 // Mantendo o seu estilo de escrita
+let baseGlobalProdutos = [];
+
 fetch('global.csv')
-    .then(resposta => {
-        return resposta.text();
-    })
+    .then(resposta => resposta.text())
     .then(dados => {
         console.log("Base global carregada com sucesso!");
         
-        // CORREÇÃO: Transformar o texto em uma lista de produtos
+        // CORREÇÃO: Transformar o bloco de texto em uma lista organizada
+        let linhas = dados.split('\n'); // Quebra o arquivo em linhas
+        baseGlobalProdutos = []; 
+        
+        linhas.forEach(linha => {
+            // O seu arquivo usa ';' como separador
+            let colunas = linha.split(';'); 
+            
+            // Só adiciona se houver descrição e código de barras
+            if (colunas.length >= 2) {
+                baseGlobalProdutos.push({
+                    descricao: colunas[0].trim(),
+                    ean: colunas[1].trim()
+                });
+            }
+        });
+        
+        console.log("Total de itens processados na memória:", baseGlobalProdutos.length);
+    })
+    .catch(erro => {
+        console.error("Erro ao carregar a base global:", erro);
+    });
         let linhas = dados.split('\n'); 
         baseGlobalProdutos = []; // Limpa a variável antes de preencher
         
