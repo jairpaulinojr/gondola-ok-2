@@ -3,7 +3,6 @@
 // ==========================================
 let baseGlobalProdutos = JSON.parse(localStorage.getItem("gondola_base_global")) || []; 
 
-// Estrutura para isolar a carga de missões por setor
 let missoesPorSetor = JSON.parse(localStorage.getItem("gondola_missoes_setores")) || {
     "Mercearia Bebidas": [],
     "Mercearia Doce": [],
@@ -56,7 +55,7 @@ function carregarPlanilhaSetor(inputElement, nomeSetor) {
             let descricaoEncontrada = item["DESCRIÇÃO"] || item["descricao"] || item["Descrição"] || item["Descricao"] || "";
 
             return {
-                id: Date.now() + idx, 
+                id: Date.now() + idx + Math.random(), 
                 codigo: String(codigoEncontrado).trim(),
                 descricao: String(descricaoEncontrada).trim(),
                 setor: nomeSetor,
@@ -184,6 +183,7 @@ function entrar() {
 }
 
 function mostrarTelaLoginInicial() {
+    usuarioAtual = ""; 
     let container = document.querySelector(".container");
     if (!container) return;
 
@@ -205,7 +205,7 @@ function mostrarTelaLoginInicial() {
 }
 
 // ==========================================
-// 4. TELA DO ADMINISTRADOR
+// 4. TELA DO ADMINISTRADOR (PAINEL DE GESTÃO)
 // ==========================================
 function abrirPainelAdmin() {
     let registros = JSON.parse(localStorage.getItem("registro_validades")) || [];
@@ -278,17 +278,48 @@ function abrirPainelAdmin() {
             ${avisoHtml}
             <div class="topo"><h1>⚙️ PAINEL DO ADMINISTRADOR</h1></div>
             <div class="login" style="text-align: left; max-width: 100%;">
+                
+                <h3 style="margin-top:0; border-bottom:1px solid #ccc; padding-bottom:5px;">Auditorias de Gôndola (20 Itens)</h3>
                 <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
-                    <button onclick="abrirMenuSetoresGerente()" style="background:#17a2b8; color:white; flex: 1; min-width: 120px;">🔑 Auditorias</button>
-                    <button onclick="abrirRelatorioValidadesGerente()" style="background:#20c997; color:white; flex: 1; min-width: 120px;">📅 Ver Validades</button>
-                    <button onclick="abrirMenuChecklistsGerente()" style="background:#6f42c1; color:white; width: 100%; margin-top: 5px;">📋 Responder Checklists</button>
+                    <button onclick="abrirMenuSetoresGerente()" style="background:#17a2b8; color:white; flex: 1; min-width: 120px;">🚨 Fila de Rupturas</button>
+                    <button onclick="abrirHistoricoMissoesGerente()" style="background:#007bff; color:white; flex: 1; min-width: 120px; font-weight:bold;">📊 Histórico de Missões</button>
+                    <button onclick="abrirHistoricoTratativasGerente()" style="background:#28a745; color:white; flex: 1; min-width: 120px; font-weight:bold;">📋 Histórico de Tratativas</button>
                 </div>
-                ${blocosInputsSetores}
-                ${blocoBaseGlobal}
-                ${blocoChecklist}
-                <button onclick="location.reload()" style="background:#6c757d; color:white; width: 100%; margin-top: 20px;">Sair</button>
+
+                <h3 style="margin-top:15px; border-bottom:1px solid #ccc; padding-bottom:5px;">Checklists Operacionais</h3>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                    <button onclick="abrirMenuChecklistsGerente()" style="background:#6f42c1; color:white; flex: 1; min-width: 120px;">📋 Responder Checklist</button>
+                    <button onclick="abrirHistoricoChecklistsGerente()" style="background:#fd7e14; color:white; flex: 1; min-width: 120px; font-weight: bold;">📊 Histórico Checklist</button>
+                </div>
+                
+                <h3 style="margin-top:15px; border-bottom:1px solid #ccc; padding-bottom:5px;">Validades</h3>
+                <button onclick="abrirRelatorioValidadesGerente()" style="background:#20c997; color:white; width:100%; margin-bottom:15px;">📅 Controlar Vencimentos</button>
+                
+                <button onclick="alternarVisibilidadeFicheiros()" id="btn-toggle-ficheiros" style="background:#495057; color:white; width:100%; margin: 15px 0;">📂 Importar Planilhas / Ficheiros (Abrir)</button>
+                
+                <div id="container-ficheiros-upload" style="display: none; background: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; border-radius: 5px;">
+                    ${blocosInputsSetores}
+                    ${blocoBaseGlobal}
+                    ${blocoChecklist}
+                </div>
+
+                <button onclick="mostrarTelaLoginInicial()" style="background:#6c757d; color:white; width: 100%; margin-top: 20px;">Voltar ao Menu Principal</button>
             </div>
         `;
+    }
+}
+
+function alternarVisibilidadeFicheiros() {
+    let box = document.getElementById("container-ficheiros-upload");
+    let btn = document.getElementById("btn-toggle-ficheiros");
+    if (box.style.display === "none") {
+        box.style.display = "block";
+        btn.innerText = "📂 Importar Planilhas / Ficheiros (Fechar)";
+        btn.style.background = "#dc3545";
+    } else {
+        box.style.display = "none";
+        btn.innerText = "📂 Importar Planilhas / Ficheiros (Abrir)";
+        btn.style.background = "#495057";
     }
 }
 
@@ -324,7 +355,7 @@ function voltarMenuPrincipal() {
             <button onclick="abrirMenuChecklistsGerente()" style="background:#6f42c1; color:white; margin-bottom: 10px;">📋 Checklist Operacional</button>
             <button onclick="abrirAbaValidade()" style="background:#20c997; color:white;">📅 Verificar Validade (Base Global)</button>
             <button onclick="abrirAbaEtiquetas()" style="background:#ffc107; color:black;">🏷️ Etiquetas Pendentes</button>
-            <button onclick="location.reload()" style="background:#6c757d; color:white; margin-top: 15px;">⬅️ Sair do App</button>
+            <button onclick="mostrarTelaLoginInicial()" style="background:#6c757d; color:white; margin-top: 15px;">⬅️ Sair do App</button>
         </div>
     `;
 }
@@ -359,7 +390,7 @@ function prepararMissaoSetor(setor) {
 // ==========================================
 function mostrarProdutoAtual() {
     if (indiceAtual >= produtosDoDia.length) {
-        finalizarMissao();
+        mostrarTelaValidacaoMissao(); 
         return;
     }
 
@@ -393,7 +424,7 @@ function mostrarProdutoAtual() {
     `;
 }
 
-function respostaAbastecido(valor) {
+function respuestaAbastecido(valor) {
     let produto = produtosDoDia[indiceAtual];
     produto.abastecido = valor;
 
@@ -417,7 +448,7 @@ function respostaAbastecido(valor) {
     }
 }
 
-function respostaPrecificado(valor) {
+function respuestaPrecificado(valor) {
     let produto = produtosDoDia[indiceAtual];
     produto.precificado = valor;
 
@@ -426,13 +457,6 @@ function respostaPrecificado(valor) {
     document.getElementById("btn-prc-nao").style.background = !valor ? "#dc3545" : "#e0e0e0";
     document.getElementById("btn-prc-nao").style.color = !valor ? "white" : "black";
 
-    if (valor === false) {
-        let etiquetas = JSON.parse(localStorage.getItem("etiquetas_pendentes")) || [];
-        if (!etiquetas.some(e => e.codigo === produto.codigo)) {
-            etiquetas.push(produto);
-            localStorage.setItem("etiquetas_pendentes", JSON.stringify(etiquetas));
-        }
-    }
     document.getElementById("btn-proximo").style.display = "block";
 }
 
@@ -442,15 +466,70 @@ function proximoProduto() {
 }
 
 // ==========================================
-// 8. FINALIZAÇÃO DA MISSÃO DIÁRIA
+// 7.5. NOVA TELA: VALIDAÇÃO DA MISSÃO
 // ==========================================
-function finalizarMissao() {
+function mostrarTelaValidacaoMissao() {
+    let total = produtosDoDia.length;
+    let abastecidos = produtosDoDia.filter(p => p.abastecido === true).length;
+    let rupturas = produtosDoDia.filter(p => p.statusRuptura === true).length;
+    let semPreco = produtosDoDia.filter(p => p.precificado === false).length;
+
+    document.querySelector(".container").innerHTML = `
+        <div class="topo">
+            <h1>📋 REVISÃO DA MISSÃO</h1>
+            <p>${setorSelecionado}</p>
+        </div>
+        <div class="login" style="max-width: 100%; text-align: left;">
+            <div style="background: #e9ecef; padding: 12px; border-radius: 5px; margin-bottom: 15px; font-size: 14px; line-height: 1.6;">
+                📊 <strong>Resumo dos Itens Verificados:</strong><br>
+                📦 Total de Itens: <strong>${total}</strong><br>
+                🟢 Abastecidos (OK): <strong style="color: green;">${abastecidos}</strong><br>
+                🔴 Rupturas Identificadas: <strong style="color: red;">${rupturas}</strong><br>
+                🏷️ Produtos Sem Etiqueta de Preço: <strong style="color: #fd7e14;">${semPreco}</strong>
+            </div>
+
+            <p style="font-size:12px; color:#6c757d; text-align:center; margin-bottom:15px;">
+                ⚠️ Se houver alguma divergência, você pode cancelar e reiniciar. Caso contrário, confirme a gravação.
+            </p>
+
+            <div style="display: flex; gap: 10px;">
+                <button onclick="finalizarEGravarMissao()" style="background-color: #28a745; color: white; width: 60%; font-weight: bold; padding:12px;">✅ Confirmar e Gravar</button>
+                <button onclick="if(confirm('Deseja cancelar esta amostragem? Os dados atuais serão perdidos.')) voltarMenuPrincipal()" style="background-color: #dc3545; color: white; width: 40%; padding:12px;">❌ Cancelar</button>
+            </div>
+        </div>
+    `;
+}
+
+// ==========================================
+// 8. FINALIZAÇÃO E GRAVAÇÃO REAL DA MISSÃO DIÁRIA
+// ==========================================
+function finalizarEGravarMissao() {
     let historico = JSON.parse(localStorage.getItem("gondola_dados")) || [];
-    let produtosMapeados = produtosDoDia.map(p => ({
-        ...p,
-        operador: usuarioAtual,
-        dataAuditoria: new Date().toLocaleDateString()
-    }));
+    let dataAtual = new Date().toLocaleDateString();
+    let horaAtual = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    let idSessaoMissao = Date.now();
+
+    let etiquetasPendenteLocal = JSON.parse(localStorage.getItem("etiquetas_pendentes")) || [];
+    
+    let produtosMapeados = produtosDoDia.map(p => {
+        if (p.precificado === false) {
+            if (!etiquetasPendenteLocal.some(e => e.codigo === p.codigo)) {
+                etiquetasPendenteLocal.push(p);
+            }
+        }
+        
+        return {
+            ...p,
+            id: Date.now() + Math.random(), 
+            idSessaoMissao: idSessaoMissao,
+            operador: usuarioAtual,
+            dataAuditoria: dataAtual,
+            horaAuditoria: horaAtual,
+            tratadoRuptura: false 
+        };
+    });
+
+    localStorage.setItem("etiquetas_pendentes", JSON.stringify(etiquetasPendenteLocal));
 
     historico = historico.concat(produtosMapeados);
     localStorage.setItem("gondola_dados", JSON.stringify(historico));
@@ -458,11 +537,11 @@ function finalizarMissao() {
     document.querySelector(".container").innerHTML = `
         <div class="topo">
             <h1>🛒 GÔNDOLA OK</h1>
-            <h2>Setor Concluído!</h2>
+            <h2>Missão Gravada!</h2>
         </div>
         <div class="login" style="text-align: center;">
-            <p>Parabéns! A auditoria dos 20 itens foi concluída.</p>
-            <button onclick="voltarMenuPrincipal()" style="background-color: #6c757d; color: white;">Voltar ao Menu</button>
+            <p style="color:green; font-weight:bold; font-size:16px;">🎉 Auditoria dos 20 itens processada com sucesso no sistema!</p>
+            <button onclick="voltarMenuPrincipal()" style="background-color: #6c757d; color: white; width:100%; padding:10px; margin-top:10px;">Voltar ao Menu</button>
         </div>
     `;
 }
@@ -501,7 +580,7 @@ function buscarProdutoValidade(codigoBarras) {
     display.style.display = "block";
 
     if (!produtoEncontrado) {
-        display.innerHTML = `<p style="color:red; text-align:center;">❌ Produto não localizado no Cadastro Mestre Global Mensal.</p>`;
+        display.innerHTML = `<p style="color:red; text-align:center;">❌ Produto não localizado no Cadastro Mestre Global.</p>`;
         return;
     }
 
@@ -601,14 +680,16 @@ function darBaixaEtiquetaManual(index) {
 }
 
 // ==========================================
-// 11. GESTÃO DE VALIDADES: GERENTE
+// 11. GESTÃO DE VALIDADES: GERENTE (FILTRADO POR HOJE)
 // ==========================================
 function abrirRelatorioValidadesGerente() {
     let todosRegistros = JSON.parse(localStorage.getItem("registro_validades")) || [];
-    let registros = todosRegistros.filter(r => r.status !== "Resolvido"); 
+    let hojeStr = new Date().toLocaleDateString();
+    
+    let registros = todosRegistros.filter(r => r.status !== "Resolvido" && r.dataRegistro === hojeStr); 
     let linhas = "";
 
-    registros.forEach((r, index) => {
+    registros.forEach((r) => {
         let estiloTratado = r.status === "Tratado" ? "background:#e8f4fd;" : "background:#ffffff;";
         let qtd = r.quantidade || 1; 
 
@@ -618,8 +699,8 @@ function abrirRelatorioValidadesGerente() {
                 <td style="padding: 10px; text-align:center; color:red; font-weight:bold;">${r.dataValidade}</td>
                 <td style="padding: 10px; text-align:center;">${qtd}</td>
                 <td style="padding: 10px; text-align:center;">
-                    <button onclick="executarAcao('${r.codigo}', '${r.dataValidade}', 'Tratado')" style="background:#007bff; color:white; border:none; padding:5px; margin:2px; cursor:pointer;">Tratar</button>
-                    <button onclick="executarAcao('${r.codigo}', '${r.dataValidade}', 'Resolvido')" style="background:#28a745; color:white; border:none; padding:5px; margin:2px; cursor:pointer;">Resolver</button>
+                    <button onclick="atualizarStatus('${r.codigo}', '${r.dataValidade}', 'Tratado')" style="background:#007bff; color:white; border:none; padding:5px; margin:2px; cursor:pointer;">Tratar</button>
+                    <button onclick="atualizarStatus('${r.codigo}', '${r.dataValidade}', 'Resolvido')" style="background:#28a745; color:white; border:none; padding:5px; margin:2px; cursor:pointer;">Resolver</button>
                 </td>
             </tr>
         `;
@@ -628,7 +709,8 @@ function abrirRelatorioValidadesGerente() {
     document.querySelector(".container").innerHTML = `
         <div class="topo"><h1>📅 GESTÃO DE VALIDADES</h1></div>
         <div class="login" style="max-width: 100%; padding: 10px;">
-            <button onclick="exportarParaExcel('Relatorio_Validades', 'registro_validades')" style="width:100%; background:#6c757d; color:white; padding:10px; margin-bottom:10px;">📥 Exportar para Excel</button>
+            <p style="font-size:12px; color:#495057; text-align:center; background:#e2e3e5; padding:5px; margin-bottom:10px; border-radius:4px;">👁️ Exibindo apenas os registros adicionados <strong>Hoje (${hojeStr})</strong></p>
+            <button onclick="exportarParaExcel('Relatorio_Validades_Completo', 'registro_validades')" style="width:100%; background:#6c757d; color:white; padding:10px; margin-bottom:10px;">📥 Exportar Histórico Completo (Excel)</button>
             <table style="width: 100%; border-collapse: collapse;">
                 <tr style="background:#f2f2f2;"><th style="padding:8px;">Prod</th><th style="padding:8px;">Venc</th><th style="padding:8px;">Qtd</th><th style="padding:8px;">Ação</th></tr>
                 ${linhas}
@@ -636,11 +718,6 @@ function abrirRelatorioValidadesGerente() {
             <button onclick="abrirPainelAdmin()" style="width:100%; margin-top:10px;">Voltar</button>
         </div>
     `;
-}
-
-function executarAcao(codigo, data, status) {
-    console.log("Tentando atualizar:", codigo, data, status);
-    atualizarStatus(codigo, data, status);
 }
 
 window.atualizarStatus = function(codigo, dataValidade, novoStatus) {
@@ -663,19 +740,19 @@ window.atualizarStatus = function(codigo, dataValidade, novoStatus) {
 function abrirMenuSetoresGerente() {
     document.querySelector(".container").innerHTML = `
         <div class="topo">
-            <h1>🔑 RELATÓRIOS POR SETOR</h1>
-            <p>Escolha o setor para auditar o dia</p>
+            <h1>🚨 FILA DE RUPTURAS CRÍTICAS</h1>
+            <p>Selecione o setor para ver apenas o que está em falta</p>
         </div>
         <div class="login">
-            <button onclick="abrirAbaGerente('Mercearia Bebidas')" style="background:#007bff; color:white;">🥤 Mercearia Bebidas</button>
-            <button onclick="abrirAbaGerente('Mercearia Doce')" style="background:#007bff; color:white;">🍬 Mercearia Doce</button>
-            <button onclick="abrirAbaGerente('Mercearia Conservas')" style="background:#007bff; color:white;">🥫 Mercearia Conservas</button>
-            <button onclick="abrirAbaGerente('Mercearia Alto Giro')" style="background:#007bff; color:white;">🔄 Mercearia Alto Giro</button>
-            <button onclick="abrirAbaGerente('Mercearia Limpeza')" style="background:#007bff; color:white;">🧴 Mercearia Limpeza</button>
-            <button onclick="abrirAbaGerente('Frios Iogurte')" style="background:#007bff; color:white;">🥛 Frios Iogurte</button>
-            <button onclick="abrirAbaGerente('Frios Congelados')" style="background:#007bff; color:white;">🧊 Frios Congelados</button>
-            <button onclick="abrirAbaGerente('Açougue')" style="background:#007bff; color:white;">🥩 Açougue</button>
-            <button onclick="abrirAbaGerente('Padaria')" style="background:#007bff; color:white;">🍞 Padaria</button>
+            <button onclick="abrirAbaGerente('Mercearia Bebidas')" style="background:#dc3545; color:white;">🥤 Mercearia Bebidas</button>
+            <button onclick="abrirAbaGerente('Mercearia Doce')" style="background:#dc3545; color:white;">🍬 Mercearia Doce</button>
+            <button onclick="abrirAbaGerente('Mercearia Conservas')" style="background:#dc3545; color:white;">🥫 Mercearia Conservas</button>
+            <button onclick="abrirAbaGerente('Mercearia Alto Giro')" style="background:#dc3545; color:white;">🔄 Mercearia Alto Giro</button>
+            <button onclick="abrirAbaGerente('Mercearia Limpeza')" style="background:#dc3545; color:white;">🧴 Mercearia Limpeza</button>
+            <button onclick="abrirAbaGerente('Frios Iogurte')" style="background:#dc3545; color:white;">🥛 Frios Iogurte</button>
+            <button onclick="abrirAbaGerente('Frios Congelados')" style="background:#dc3545; color:white;">🧊 Frios Congelados</button>
+            <button onclick="abrirAbaGerente('Açougue')" style="background:#dc3545; color:white;">🥩 Açougue</button>
+            <button onclick="abrirAbaGerente('Padaria')" style="background:#dc3545; color:white;">🍞 Padaria</button>
             
             <hr style="margin: 20px 0; border: 0; border-top: 1px solid #ccc;">
             <button onclick="abrirPainelAdmin()" style="background-color: #6c757d; color: white; width: 100%;">Voltar ao Painel Admin</button>
@@ -684,33 +761,30 @@ function abrirMenuSetoresGerente() {
 }
 
 // ==========================================
-// 13. GERENTE: VISUALIZAÇÃO DE RESULTADOS AUDITORIA
+// 13. GERENTE: FILA COM ITENS COM RUPTURA ATIVA
 // ==========================================
 function abrirAbaGerente(setorFiltro) {
     let dados = JSON.parse(localStorage.getItem("gondola_dados")) || [];
-    let itensVistoriadosDoSetor = dados.filter(p => p.setor === setorFiltro);
+    let rupturasPendentesSetor = dados.filter(p => p.setor === setorFiltro && p.statusRuptura === true && p.tratadoRuptura !== true);
 
     let linesTabela = "";
-    if (itensVistoriadosDoSetor.length === 0) {
-        linesTabela = `<tr><td colspan="3" style="padding:15px; text-align:center; color:#666;">Nenhum item vistoriado hoje neste setor.</td></tr>`;
+    if (rupturasPendentesSetor.length === 0) {
+        linesTabela = `<tr><td colspan="3" style="padding:30px; text-align:center; color:green; font-weight:bold; font-size:14px;">🎉 Excelente! Nenhuma ruptura pendente neste setor.</td></tr>`;
     } else {
-        itensVistoriadosDoSetor.forEach(p => {
-            let statusAbs = p.abastecido ? "<span style='color:green; font-weight:bold;'>🟢 OK</span>" : "<span style='color:red; font-weight:bold;'>🔴 RUPTURA</span>";
-            let statusPrc = p.precificado === true ? "🟢 Sim" : (p.precificado === false ? "🔴 Não" : "⚠️ N/A");
-
+        rupturasPendentesSetor.forEach(p => {
             linesTabela += `
-                <tr style="border-bottom: 1px solid #ddd; font-size: 12px;">
-                    <td style="padding: 10px;">${p.descricao}<br><small style="color:#777;">Cód: ${p.codigo}</small></td>
-                    <td style="padding: 10px; text-align:center;">Abs: ${statusAbs}<br>Preço: ${statusPrc}</td>
-                    <td style="padding: 10px;">
-                        ${p.statusRuptura ? `
-                            <select onchange="salvarDecisaoGerente('${setorFiltro}', ${p.id}, this.value)" style="padding: 4px; font-size:11px; width: 100%;">
-                                <option value="">Definir motivo...</option>
-                                <option value="Estoque Zerado" ${p.finalizacaoGerente === 'Estoque Zerado' ? 'selected' : ''}>❌ Estoque Zerado</option>
-                                <option value="Não Abastecido" ${p.finalizacaoGerente === 'Não Abastecido' ? 'selected' : ''}>⚠️ Não Abastecido</option>
-                                <option value="Somente no Sistema" ${p.finalizacaoGerente === 'Somente no Sistema' ? 'selected' : ''}>💻 No Sistema</option>
-                            </select>
-                        ` : `<span style="color:gray; font-size:11px;">Sem tratativa</span>`}
+                <tr style="border-bottom: 1px solid #ddd; font-size: 13px;">
+                    <td style="padding: 12px;"><strong>${p.descricao}</strong><br><small style="color:#555;">Cód: ${p.codigo}</small><br><span style="font-size:10px; color:#777;">Auditado em: ${p.dataAuditoria} por ${p.operador}</span></td>
+                    <td style="padding: 12px; text-align:center; vertical-align:middle;">
+                        <select id="motivo-${String(p.id).replace('.', '_')}" style="padding: 6px; font-size:12px; width: 100%; border:1px solid #ccc; border-radius:4px;">
+                            <option value="Não Informado">Definir motivo...</option>
+                            <option value="Estoque Zerado">❌ Estoque Zerado</option>
+                            <option value="Não Abastecido">⚠️ Não Abastecido</option>
+                            <option value="Somente no Sistema">💻 No Sistema</option>
+                        </select>
+                    </td>
+                    <td style="padding: 12px; text-align:center; vertical-align:middle; width:70px;">
+                        <button onclick="salvarResolucaoRuptura('${setorFiltro}', '${p.id}')" style="background:#28a745; color:white; border:none; padding:8px 10px; font-size:12px; font-weight:bold; border-radius:4px; cursor:pointer;">✓ Ok</button>
                     </td>
                 </tr>
             `;
@@ -719,16 +793,16 @@ function abrirAbaGerente(setorFiltro) {
 
     document.querySelector(".container").innerHTML = `
         <div class="topo">
-            <h1>📊 AUDITORIA: ${setorFiltro.toUpperCase()}</h1>
-            <p>Resultados da amostragem diária</p>
+            <h1>🚨 RUPTURAS: ${setorFiltro.toUpperCase()}</h1>
+            <p>Painel focado exclusivamente em ações corretivas</p>
         </div>
         <div class="login" style="max-width: 100%; padding: 10px;">
             <table style="width: 100%; border-collapse: collapse; text-align: left; background:white;">
                 <thead>
-                    <tr style="background-color: #f2f2f2; font-size:12px;">
-                        <th style="padding: 10px;">Produto</th>
-                        <th style="padding: 10px; text-align:center;">Status Loja</th>
-                        <th style="padding: 10px;">Tratativa Ruptura</th>
+                    <tr style="background-color: #f2f2f2; font-size:12px; border-bottom:2px solid #ccc;">
+                        <th style="padding: 10px;">Produto em Falta</th>
+                        <th style="padding: 10px;">Motivo da Ocorrência</th>
+                        <th style="padding: 10px; text-align:center;">Ação</th>
                     </tr>
                 </thead>
                 <tbody>${linesTabela}</tbody>
@@ -739,14 +813,229 @@ function abrirAbaGerente(setorFiltro) {
     `;
 }
 
-function salvarDecisaoGerente(setorOrigem, idProd, motivo) {
+function salvarResolucaoRuptura(setorOrigem, idItemString) {
     let dados = JSON.parse(localStorage.getItem("gondola_dados")) || [];
-    let item = dados.find(p => p.id === idProd);
+    let historicoTratativas = JSON.parse(localStorage.getItem("gondola_historico_tratativas")) || [];
+    
+    let elMotivo = document.getElementById(`motivo-${idItemString.replace('.', '_')}`);
+    let motivoSelecionado = elMotivo ? elMotivo.value : "Não Informado";
+
+    let item = dados.find(p => String(p.id) === String(idItemString));
+    
     if (item) {
-        item.finalizacaoGerente = motivo;
+        let dataAtual = new Date().toLocaleDateString();
+        let horaAtual = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        item.finalizacaoGerente = motivoSelecionado;
+        item.tratadoRuptura = true; 
         localStorage.setItem("gondola_dados", JSON.stringify(dados));
+
+        historicoTratativas.push({
+            idTratativa: Date.now(),
+            codigo: item.codigo,
+            descricao: item.descricao,
+            setor: item.setor,
+            operadorOrigem: item.operador,
+            dataAuditoria: item.dataAuditoria,
+            motivoRuptura: motivoSelecionado,
+            gerenteResponsavel: usuarioAtual || "Administrador",
+            dataTratativa: dataAtual,
+            horaTratativa: horaAtual
+        });
+        
+        localStorage.setItem("gondola_historico_tratativas", JSON.stringify(historicoTratativas));
+        alert("✅ Tratativa gravada! O item sairá da lista.");
+        
         abrirAbaGerente(setorOrigem);
+    } else {
+        alert("Erro ao processar item.");
     }
+}
+
+// ==========================================
+// 13.6. HISTÓRICO DE TRATATIVAS (CLICÁVEL POR DATA)
+// ==========================================
+function abrirHistoricoTratativasGerente(dataFiltro = null) {
+    let historico = JSON.parse(localStorage.getItem("gondola_historico_tratativas")) || [];
+    let hojeStr = new Date().toLocaleDateString();
+    
+    let dataAlvo = hojeStr;
+    if (dataFiltro) {
+        let partes = dataFiltro.split("-");
+        dataAlvo = `${partes[2]}/${partes[1]}/${partes[0]}`;
+    }
+
+    let container = document.querySelector(".container");
+    if (!container) return;
+
+    let historicoFiltrado = historico.filter(t => t.dataTratativa === dataAlvo);
+
+    let linhasHtml = "";
+    if (historicoFiltrado.length === 0) {
+        linhasHtml = `<p style="text-align:center; color:#777; padding:30px; background:white; border-radius:4px;">Nenhuma tratativa resolvida nesta data (${dataAlvo}).</p>`;
+    } else {
+        let historicoInvertido = [...historicoFiltrado].reverse(); 
+        historicoInvertido.forEach(t => {
+            linhasHtml += `
+                <div style="background: white; border: 1px solid #dee2e6; border-radius: 6px; padding: 12px; margin-bottom: 10px; border-left: 5px solid #28a745; text-align:left;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px; border-bottom: 1px solid #f8f9fa; padding-bottom:4px;">
+                        <span style="font-size:11px; background:#e8f4fd; color:#0056b3; padding:2px 6px; border-radius:3px; font-weight:bold;">${t.setor}</span>
+                        <span style="font-size:11px; color:#6c757d;">🛠️ Resolvido às: ${t.horaTratativa}</span>
+                    </div>
+                    <p style="margin:0 0 6px 0; font-size:13px; color:#222;"><strong>${t.descricao}</strong> <small style="color:#666;">(${t.codigo})</small></p>
+                    <div style="font-size:11px; color:#495057; background:#f8f9fa; padding:6px; border-radius:4px; display:flex; flex-direction:column; gap:2px;">
+                        <span>❌ <strong>Ruptura:</strong> ${t.motivoRuptura}</span>
+                        <span>👤 <strong>Repositores:</strong> ${t.operadorOrigem} (Auditou em ${t.dataAuditoria})</span>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    let partesInput = dataAlvo.split("/");
+    let dataInputFormat = `${partesInput[2]}-${partesInput[1]}-${partesInput[0]}`;
+
+    container.innerHTML = `
+        <div class="topo">
+            <h1>📋 HISTÓRICO DE TRATATIVAS</h1>
+            <p>Tratativas do dia: <strong>${dataAlvo}</strong></p>
+        </div>
+        <div class="login" style="max-width: 100%; max-height: 70vh; overflow-y: auto; padding: 10px;">
+            
+            <div style="background:#e2e3e5; padding:10px; margin-bottom:15px; border-radius:4px; text-align:center;">
+                <label style="font-size:12px; font-weight:bold; color:#495057; display:block; margin-bottom:5px;">📅 CLIQUE ABAIXO PARA CONSULTAR OUTRA DATA:</label>
+                <input type="date" value="${dataInputFormat}" onchange="abrirHistoricoTratativasGerente(this.value)" style="padding:6px; font-size:14px; width:80%; max-width:200px; border:1px solid #ccc; border-radius:4px;">
+            </div>
+
+            <button onclick="exportarParaExcel('Historico_Tratativas_Geral', 'gondola_historico_tratativas')" style="width:100%; background:#6c757d; color:white; padding:8px; margin-bottom:15px; font-weight:bold;">📥 Exportar Todo o Histórico Mensal (Excel)</button>
+            ${linhasHtml}
+            <button onclick="abrirPainelAdmin()" style="background:#495057; color:white; width:100%; margin-top:15px;">⬅️ Voltar ao Painel</button>
+        </div>
+    `;
+}
+
+// ==========================================
+// 13.7. HISTÓRICO DE LEITURA DAS MISSÕES (CLICÁVEL POR DATA)
+// ==========================================
+function abrirHistoricoMissoesGerente(dataFiltro = null) {
+    let dados = JSON.parse(localStorage.getItem("gondola_dados")) || [];
+    let hojeStr = new Date().toLocaleDateString();
+    
+    let dataAlvo = hojeStr;
+    if (dataFiltro) {
+        let partes = dataFiltro.split("-");
+        dataAlvo = `${partes[2]}/${partes[1]}/${partes[0]}`;
+    }
+
+    let container = document.querySelector(".container");
+    if (!container) return;
+
+    let sessoesMapeadas = {};
+    dados.forEach(item => {
+        if (item.dataAuditoria === dataAlvo) {
+            let id = item.idSessaoMissao || (item.dataAuditoria + "_" + item.setor); 
+            if (!sessoesMapeadas[id]) {
+                sessoesMapeadas[id] = {
+                    idSessao: id,
+                    setor: item.setor,
+                    operador: item.operador || "Não Informado",
+                    data: item.dataAuditoria,
+                    hora: item.horaAuditoria || "--:--",
+                    produtos: []
+                };
+            }
+            sessoesMapeadas[id].produtos.push(item);
+        }
+    });
+
+    let listaSessoes = Object.values(sessoesMapeadas).reverse(); 
+
+    let linesHtml = "";
+    if (listaSessoes.length === 0) {
+        linesHtml = `<p style="text-align:center; color:#777; padding:20px;">Nenhuma amostragem de gôndola foi auditada em ${dataAlvo}.</p>`;
+    } else {
+        listaSessoes.forEach(s => {
+            let total = s.produtos.length;
+            let rupturas = s.produtos.filter(p => p.statusRuptura === true).length;
+            let semPreco = s.produtos.filter(p => p.precificado === false).length;
+            let conformes = total - rupturas;
+
+            linesHtml += `
+                <div onclick="verDetalhesMissao('${s.idSessao}')" style="background: white; border: 1px solid #dee2e6; border-radius: 6px; padding: 12px; margin-bottom: 10px; cursor: pointer; border-left: 5px solid #007bff; transition: 0.2s; text-align:left;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
+                        <strong style="color: #333; font-size:14px;">${s.setor}</strong>
+                        <span style="font-size:11px; color:#6c757d;">Horário: ${s.hora}</span>
+                    </div>
+                    <div style="font-size:12px; color:#495057; display:flex; justify-content:space-between;">
+                        <span>👤 Op: ${s.operador}</span>
+                        <span>🟢 ${conformes} | 🔴 Rup: ${rupturas} | 🏷️ Etq: ${semPreco}</span>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    let partesInput = dataAlvo.split("/");
+    let dataInputFormat = `${partesInput[2]}-${partesInput[1]}-${partesInput[0]}`;
+
+    container.innerHTML = `
+        <div class="topo">
+            <h1>📊 LEITURA DE MISSÕES</h1>
+            <p>Missões do dia: <strong>${dataAlvo}</strong></p>
+        </div>
+        <div class="login" style="max-width: 100%; max-height: 70vh; overflow-y: auto; padding: 10px;">
+            
+            <div style="background:#e2e3e5; padding:10px; margin-bottom:15px; border-radius:4px; text-align:center;">
+                <label style="font-size:12px; font-weight:bold; color:#495057; display:block; margin-bottom:5px;">📅 CLIQUE ABAIXO PARA CONSULTAR OUTRA DATA:</label>
+                <input type="date" value="${dataInputFormat}" onchange="abrirHistoricoMissoesGerente(this.value)" style="padding:6px; font-size:14px; width:80%; max-width:200px; border:1px solid #ccc; border-radius:4px;">
+            </div>
+
+            <button onclick="exportarParaExcel('Historico_Geral_Missoes', 'gondola_dados')" style="width:100%; background:#6c757d; color:white; padding:8px; margin-bottom:15px; font-weight:bold;">📥 Exportar Toda a Base Histórica (Excel)</button>
+            ${linesHtml}
+            <button onclick="abrirPainelAdmin()" style="background:#495057; color:white; width:100%; margin-top:15px;">⬅️ Voltar ao Painel</button>
+        </div>
+    `;
+}
+
+function verDetalhesMissao(idSessao) {
+    let dados = JSON.parse(localStorage.getItem("gondola_dados")) || [];
+    let produtosSessao = dados.filter(p => (p.idSessaoMissao == idSessao || (p.dataAuditoria + "_" + p.setor) == idSessao));
+    if (produtosSessao.length === 0) return;
+
+    let infoBase = produtosSessao[0];
+    let container = document.querySelector(".container");
+
+    let itensHtml = "";
+    produtosSessao.forEach((p, index) => {
+        let absBadge = p.abastecido ? `<span style="color:green; font-weight:bold;">🟢 Abastecido</span>` : `<span style="color:red; font-weight:bold;">🔴 RUPTURA</span>`;
+        let prcBadge = p.precificado === true ? `| Preço: <span style="color:green;">🟢 OK</span>` : (p.precificado === false ? `| Preço: <span style="color:red; font-weight:bold;">🔴 SEM ETIQUETA</span>` : `| Preço: <span style="color:gray;">⚠️ N/A</span>`);
+        let tratativa = p.finalizacaoGerente ? `<br><span style="color:#28a745; font-size:11px;">🛠️ Solução: <strong>${p.finalizacaoGerente}</strong></span>` : "";
+
+        itensHtml += `
+            <div style="padding: 10px 0; border-bottom: 1px solid #eee; font-size: 13px;">
+                <p style="margin: 0 0 5px 0;"><strong>${index + 1}. ${p.descricao}</strong> <small style="color:#777;">(${p.codigo})</small></p>
+                <div style="background:#f8f9fa; padding:6px; border-radius:4px; font-size:12px;">
+                    ${absBadge} ${prcBadge}
+                    ${tratativa}
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = `
+        <div class="topo">
+            <h1>📋 DETALHES DA MISSÃO</h1>
+            <p>${infoBase.setor}</p>
+        </div>
+        <div class="login" style="max-width: 100%; max-height: 70vh; overflow-y: auto; text-align:left; padding: 15px;">
+            <div style="background:#e9ecef; padding:8px; border-radius:4px; font-size:12px; margin-bottom:15px; color:#495057;">
+                👤 <strong>Operador:</strong> ${infoBase.operador || "Não Informado"}<br>
+                📅 <strong>Data:</strong> ${infoBase.dataAuditoria} às ${infoBase.horaAuditoria || "--:--"}<br>
+            </div>
+            ${itensHtml}
+            <button onclick="abrirHistoricoMissoesGerente()" style="background:#6c757d; color:white; width:100%; margin-top:20px;">⬅️ Voltar ao Histórico</button>
+        </div>
+    `;
 }
 
 // ==========================================
@@ -783,7 +1072,7 @@ function abrirMenuChecklistsGerente() {
         <div class="login" style="text-align: left; max-width: 100%; max-height: 75vh; overflow-y: auto;">
             <p style="font-size: 13px; color: #6c757d; margin-bottom: 15px; text-align: center;">Selecione um setor abaixo para responder o questionário.</p>
             ${botoesHtml}
-            <button onclick="location.reload()" style="background:#6c757d; color:white; width: 100%; margin-top: 15px;">Voltar</button>
+            <button onclick="usuarioAtual === 'Administrador' ? abrirPainelAdmin() : voltarMenuPrincipal()" style="background:#6c757d; color:white; width: 100%; margin-top: 15px;">Voltar</button>
         </div>
     `;
 }
@@ -818,31 +1107,31 @@ window.gerarEtiquetasCodigoBarras = function(lista) {
 };
 
 // ==========================================
-// 16. CONTROLE DE EXIBIÇÃO DO CHECKLIST
+// 16. CONTROLE DE EXIBIÇÃO E FILTRO DO CHECKLIST
 // ==========================================
+let perguntasAtivasChecklist = []; 
+
 function abrirChecklistSetor(setor) {
     let todasPerguntas = JSON.parse(localStorage.getItem("gondola_checklist_config")) || [];
     let perguntasDoSetor = todasPerguntas.filter(p => p.setor.toLowerCase() === setor.toLowerCase());
 
     let hoje = new Date();
     let diaDaSemana = hoje.getDay(); 
-    let diaDoChecklistCompleto = 0; // 0 = Domingo
-
-    let perguntasFiltradas = [];
+    let diaDoChecklistCompleto = 0; 
     let modoVisualizacao = "";
 
     if (diaDaSemana === diaDoChecklistCompleto) {
-        perguntasFiltradas = perguntasDoSetor;
+        perguntasAtivasChecklist = perguntasDoSetor;
         modoVisualizacao = "🔥 COMPLETO DE DOMINGO";
     } else {
-        perguntasFiltradas = perguntasDoSetor.filter(p => p.diaria === true);
+        perguntasAtivasChecklist = perguntasDoSetor.filter(p => p.diaria === true);
         modoVisualizacao = "⚡ MISSÃO DIÁRIA RÁPIDA";
     }
 
     let container = document.querySelector(".container");
     if (!container) return;
 
-    if (perguntasFiltradas.length === 0) {
+    if (perguntasAtivasChecklist.length === 0) {
         container.innerHTML = `
             <div class="topo"><h1>📋 ${setor}</h1></div>
             <div class="login" style="text-align: center;">
@@ -856,7 +1145,7 @@ function abrirChecklistSetor(setor) {
     }
 
     let htmlPerguntas = "";
-    perguntasFiltradas.forEach((p, index) => {
+    perguntasAtivasChecklist.forEach((p, index) => {
         htmlPerguntas += `
             <div style="margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid #e9ecef;">
                 <label style="display: block; margin-bottom: 6px; font-size: 14px;">
@@ -875,7 +1164,7 @@ function abrirChecklistSetor(setor) {
     container.innerHTML = `
         <div class="topo">
             <h1>📋 ${setor}</h1>
-            <p style="font-size:11px; margin-top:-5px; color:#fff; opacity:0.8;">Foco de hoje: <strong>${modoVisualizacao}</strong> (${perguntasFiltradas.length} itens)</p>
+            <p style="font-size:11px; margin-top:-5px; color:#fff; opacity:0.8;">Foco de hoje: <strong>${modoVisualizacao}</strong> (${perguntasAtivasChecklist.length} itens)</p>
         </div>
         <div class="login" style="text-align: left; max-width: 100%; max-height: 65vh; overflow-y: auto;">
             ${htmlPerguntas}
@@ -888,6 +1177,160 @@ function abrirChecklistSetor(setor) {
 }
 
 // ==========================================
-// EXECUÇÃO INICIAL MANDATÓRIA AO CARREGAR A PÁGINA
+// 17. GRAVAÇÃO DAS RESPOSTAS DO CHECKLIST
+// ==========================================
+function salvarRespostasChecklist(nomeSetor) {
+    let historicoChecklists = JSON.parse(localStorage.getItem("gondola_historico_checklists")) || [];
+    let dataAtual = new Date().toLocaleDateString();
+    let horaAtual = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    let novasRespostas = [];
+
+    perguntasAtivasChecklist.forEach(p => {
+        let elResposta = document.getElementById(`resp-checklist-${p.id}`);
+        let elObservacao = document.getElementById(`obs-checklist-${p.id}`);
+        
+        if (elResposta) {
+            novasRespostas.push({
+                perguntaId: p.id,
+                perguntaTexto: p.pergunta,
+                resposta: elResposta.value, 
+                observacao: elObservacao ? elObservacao.value.trim() : ""
+            });
+        }
+    });
+
+    if (novasRespostas.length === 0) {
+        alert("Nenhuma resposta coletada.");
+        return;
+    }
+
+    let registroSessao = {
+        idSessao: Date.now(),
+        setor: nomeSetor,
+        usuario: usuarioAtual || "Administrador",
+        data: dataAtual,
+        hora: horaAtual,
+        itensRespondidos: novasRespostas
+    };
+
+    historicoChecklists.push(registroSessao);
+    localStorage.setItem("gondola_historico_checklists", JSON.stringify(historicoChecklists));
+
+    alert(`📋 Checklist de [${nomeSetor}] saved successfully!`);
+    abrirMenuChecklistsGerente();
+}
+
+// ==========================================
+// 18. ABA: LEITURA DO HISTÓRICO DE CHECKLISTS (CLICÁVEL POR DATA)
+// ==========================================
+function abrirHistoricoChecklistsGerente(dataFiltro = null) {
+    let historico = JSON.parse(localStorage.getItem("gondola_historico_checklists")) || [];
+    let hojeStr = new Date().toLocaleDateString();
+    
+    let dataAlvo = hojeStr;
+    if (dataFiltro) {
+        let partes = dataFiltro.split("-");
+        dataAlvo = `${partes[2]}/${partes[1]}/${partes[0]}`;
+    }
+
+    let container = document.querySelector(".container");
+    if (!container) return;
+
+    let historicoFiltrado = historico.filter(s => s.data === dataAlvo);
+
+    let linhasHtml = "";
+    if (historicoFiltrado.length === 0) {
+        linhasHtml = `<p style="text-align:center; color:#777; padding:20px;">Nenhum checklist foi respondido nesta data (${dataAlvo}).</p>`;
+    } else {
+        let historicoInvertido = [...historicoFiltrado].reverse();
+        historicoInvertido.forEach(sessao => {
+            let total = sessao.itensRespondidos.length;
+            let oks = sessao.itensRespondidos.filter(r => r.resposta === "OK").length;
+            let naos = sessao.itensRespondidos.filter(r => r.resposta === "NAO_CONFORME").length;
+
+            linhasHtml += `
+                <div onclick="verDetalhesChecklist(${sessao.idSessao})" style="background: white; border: 1px solid #dee2e6; border-radius: 6px; padding: 12px; margin-bottom: 10px; cursor: pointer; border-left: 5px solid #6f42c1; transition: 0.2s; text-align:left;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
+                        <strong style="color: #333; font-size:14px;">${sessao.setor}</strong>
+                        <span style="font-size:11px; color:#6c757d;">Horário: ${sessao.hora}</span>
+                    </div>
+                    <div style="font-size:12px; color:#495057; display:flex; justify-content:space-between;">
+                        <span>👤 Resp: ${sessao.usuario}</span>
+                        <span>🟢 ${oks} | 🔴 ${naos} | 📦 Itens: ${total}</span>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    let partesInput = dataAlvo.split("/");
+    let dataInputFormat = `${partesInput[2]}-${partesInput[1]}-${partesInput[0]}`;
+
+    container.innerHTML = `
+        <div class="topo">
+            <h1>📋 HISTÓRICO DE CHECKLISTS</h1>
+            <p>Vistorias do dia: <strong>${dataAlvo}</strong></p>
+        </div>
+        <div class="login" style="max-width: 100%; max-height: 70vh; overflow-y: auto; padding: 10px;">
+            
+            <div style="background:#e2e3e5; padding:10px; margin-bottom:15px; border-radius:4px; text-align:center;">
+                <label style="font-size:12px; font-weight:bold; color:#495057; display:block; margin-bottom:5px;">📅 CLIQUE ABAIXO PARA CONSULTAR OUTRA DATA:</label>
+                <input type="date" value="${dataInputFormat}" onchange="abrirHistoricoChecklistsGerente(this.value)" style="padding:6px; font-size:14px; width:80%; max-width:200px; border:1px solid #ccc; border-radius:4px;">
+            </div>
+
+            <button onclick="exportarParaExcel('Historico_Checklists_Completo', 'gondola_historico_checklists')" style="width:100%; background:#6c757d; color:white; padding:8px; margin-bottom:15px; font-weight:bold;">📥 Exportar Todos os Meses (Excel)</button>
+            ${linhasHtml}
+            <button onclick="abrirPainelAdmin()" style="background:#495057; color:white; width:100%; margin-top:15px;">⬅️ Voltar ao Painel</button>
+        </div>
+    `;
+}
+
+// ==========================================
+// 19. DETALHES DO CHECKLIST SELECIONADO
+// ==========================================
+function verDetalhesChecklist(idSessao) {
+    let historico = JSON.parse(localStorage.getItem("gondola_historico_checklists")) || [];
+    let sessao = historico.find(s => s.idSessao === idSessao);
+    
+    let container = document.querySelector(".container");
+    if (!container || !sessao) return;
+
+    let itensHtml = "";
+    sessao.itensRespondidos.forEach((item, index) => {
+        let badge = "";
+        if (item.resposta === "OK") badge = `<span style="color:green; font-weight:bold;">🟢 OK</span>`;
+        if (item.resposta === "NAO_CONFORME") badge = `<span style="color:red; font-weight:bold;">🔴 NÃO CONFORME</span>`;
+        if (item.resposta === "NA") badge = `<span style="color:orange; font-weight:bold;">⚠️ N/A</span>`;
+
+        itensHtml += `
+            <div style="padding: 10px 0; border-bottom: 1px solid #eee; font-size: 13px;">
+                <p style="margin: 0 0 5px 0;"><strong>${index + 1}. ${item.perguntaTexto}</strong></p>
+                <div style="display:flex; justify-content:space-between; align-items:center; background:#f8f9fa; padding:6px; border-radius:4px;">
+                    <span>Status: ${badge}</span>
+                    ${item.observacao ? `<span style="font-style:italic; font-size:11px; color:#555; max-width:60%; text-align:right;">💬 "${item.observacao}"</span>` : ""}
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = `
+        <div class="topo">
+            <h1>📊 DETALHES DA VISTORIA</h1>
+            <p>${sessao.setor} | Por: ${sessao.usuario}</p>
+        </div>
+        <div class="login" style="max-width: 100%; max-height: 70vh; overflow-y: auto; text-align:left; padding: 15px;">
+            <div style="background:#e9ecef; padding:8px; border-radius:4px; font-size:12px; margin-bottom:15px; color:#495057;">
+                📅 <strong>Data:</strong> ${sessao.data} às ${sessao.hora}<br>
+                🆔 <strong>ID da Sessão:</strong> ${sessao.idSessao}
+            </div>
+            ${itensHtml}
+            <button onclick="abrirHistoricoChecklistsGerente()" style="background:#6c757d; color:white; width:100%; margin-top:20px;">⬅️ Voltar ao Histórico</button>
+        </div>
+    `;
+}
+
+// ==========================================
+// EXECUÇÃO INICIAL
 // ==========================================
 mostrarTelaLoginInicial();
