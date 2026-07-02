@@ -125,7 +125,7 @@ function carregarConfigChecklist(input) {
             
             let perguntasFormatadas = [];
             linhas.forEach((linha, index) => {
-                let setorNome = linha["SETOR"] || linha["setor"];
+                let setorNome = line["SETOR"] || linha["setor"];
                 let perguntaTexto = linha["PERGUNTA"] || linha["pergunta"];
                 let ehDiariaRaw = linha["DIARIA"] || linha["diaria"] || "NÃO";
                 
@@ -424,7 +424,7 @@ function mostrarProdutoAtual() {
     `;
 }
 
-function respuestaAbastecido(valor) {
+function respostaAbastecido(valor) {
     let produto = produtosDoDia[indiceAtual];
     produto.abastecido = valor;
 
@@ -448,7 +448,7 @@ function respuestaAbastecido(valor) {
     }
 }
 
-function respuestaPrecificado(valor) {
+function respostaPrecificado(valor) {
     let produto = produtosDoDia[indiceAtual];
     produto.precificado = valor;
 
@@ -461,6 +461,9 @@ function respuestaPrecificado(valor) {
 }
 
 function proximoProduto() {
+    // Grava as definições atuais do produto na memória interna antes de mudar o índice
+    produtosDoDia[indiceAtual] = { ...produtosDoDia[indiceAtual] };
+    
     indiceAtual++;
     mostrarProdutoAtual();
 }
@@ -761,7 +764,7 @@ function abrirMenuSetoresGerente() {
 }
 
 // ==========================================
-// 13. GERENTE: FILA COM ITENS COM RUPTURA ATIVA
+// 13. GERENTE: FILA WITH ITENS COM RUPTURA ATIVA
 // ==========================================
 function abrirAbaGerente(setorFiltro) {
     let dados = JSON.parse(localStorage.getItem("gondola_dados")) || [];
