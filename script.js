@@ -20,6 +20,10 @@ let usuarioAtual = "";
 let setorSelecionado = "";
 let indiceAtual = 0;
 let html5QrcodeScanner = null;
+// --- ADICIONE APENAS ESTAS LINHAS ABAIXO PARA O CHECKLIST ---
+let checklistGerencialDoDia = JSON.parse(localStorage.getItem("gondola_checklist_dia")) || [];
+let respostasChecklistAtual = JSON.parse(localStorage.getItem("gondola_respostas_checklist_atual")) || {};
+let historicoChecklistsSalvos = JSON.parse(localStorage.getItem("gondola_historico_checklists")) || [];
 
 // ==========================================
 // 1.5. FUNÇÃO DE EXPORTAÇÃO (UTILS)
@@ -106,49 +110,76 @@ function carregarBaseGlobal(inputElement) {
 // ==========================================
 function carregarConfigChecklist(input) {
     if (!input.files || input.files.length === 0) return;
-    
+
     let file = input.files[0];
     let reader = new FileReader();
-    
-    reader.onload = function(e) {
+
+    reader.onload = function (e) {
         try {
             let data = new Uint8Array(e.target.result);
-            let workbook = XLSX.read(data, { type: 'array' });
+            let workbook = XLSX.read(data, { type: "array" });
+
             let firstSheetName = workbook.SheetNames[0];
             let worksheet = workbook.Sheets[firstSheetName];
+
             let linhas = XLSX.utils.sheet_to_json(worksheet);
-            
+
             if (linhas.length === 0) {
                 alert("⚠️ A planilha de checklist está vazia!");
                 return;
             }
-            
+
             let perguntasFormatadas = [];
+
             linhas.forEach((linha, index) => {
-                let setorNome = line["SETOR"] || linha["setor"];
-                let perguntaTexto = linha["PERGUNTA"] || linha["pergunta"];
-                let ehDiariaRaw = linha["DIARIA"] || linha["diaria"] || "NÃO";
-                
+
+                let setorNome =
+                    linha["SETOR"] ||
+                    linha["Setor"] ||
+                    linha["setor"] ||
+                    "";
+
+                let perguntaTexto =
+                    linha["PERGUNTA"] ||
+                    linha["Pergunta"] ||
+                    linha["pergunta"] ||
+                    "";
+
+                let ehDiariaRaw =
+                    linha["DIARIA"] ||
+                    linha["Diaria"] ||
+                    linha["DIÁRIA"] ||
+                    linha["diaria"] ||
+                    "NÃO";
+
                 if (setorNome && perguntaTexto) {
-                    let ehDiaria = String(ehDiariaRaw).trim().toUpperCase() === "SIM";
                     perguntasFormatadas.push({
                         id: Date.now() + index,
                         setor: String(setorNome).trim(),
                         pergunta: String(perguntaTexto).trim(),
-                        diaria: ehDiaria
+                        diaria: String(ehDiariaRaw).trim().toUpperCase() === "SIM"
                     });
                 }
+
             });
-            
-            localStorage.setItem("gondola_checklist_config", JSON.stringify(perguntasFormatadas));
-            alert(`✅ Sucesso! ${perguntasFormatadas.length} perguntas de checklist foram importadas.`);
+
+            localStorage.setItem(
+                "gondola_checklist_config",
+                JSON.stringify(perguntasFormatadas)
+            );
+
+            alert(
+                `✅ Sucesso! ${perguntasFormatadas.length} perguntas de checklist foram importadas.`
+            );
+
             abrirPainelAdmin();
-            
-        } catch (err) {
-            console.error(err);
+
+        } catch (erro) {
+            console.error(erro);
             alert("❌ Erro ao ler o arquivo Excel.");
         }
     };
+
     reader.readAsArrayBuffer(file);
 }
 
@@ -288,8 +319,8 @@ function abrirPainelAdmin() {
 
                 <h3 style="margin-top:15px; border-bottom:1px solid #ccc; padding-bottom:5px;">Checklists Operacionais</h3>
                 <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
-                    <button onclick="abrirMenuChecklistsGerente()" style="background:#6f42c1; color:white; flex: 1; min-width: 120px;">📋 Responder Checklist</button>
-                    <button onclick="abrirHistoricoChecklistsGerente()" style="background:#fd7e14; color:white; flex: 1; min-width: 120px; font-weight: bold;">📊 Histórico Checklist</button>
+                    <button id="btn-responder-checklist" style="background:#6f42c1; color:white; flex: 1; min-width: 120px;">📋 Responder Checklist</button>
+                    <button id="btn-historico-checklist" style="background:#fd7e14; color:white; flex: 1; min-width: 120px; font-weight: bold;">📊 Histórico Checklist</button>
                 </div>
                 
                 <h3 style="margin-top:15px; border-bottom:1px solid #ccc; padding-bottom:5px;">Validades</h3>
@@ -306,32 +337,46 @@ function abrirPainelAdmin() {
                 <button onclick="mostrarTelaLoginInicial()" style="background:#6c757d; color:white; width: 100%; margin-top: 20px;">Voltar ao Menu Principal</button>
             </div>
         `;
+
+        // AJUSTE: Vinculação manual dos eventos após a renderização
+        document.getElementById("btn-responder-checklist").addEventListener("click", abrirMenuChecklistsGerente);
+        document.getElementById("btn-historico-checklist").addEventListener("click", function() {
+            abrirHistoricoChecklistsGerente();
+        });
     }
 }
 
+mostrarTelaLoginInicial();
+// 4.5. MOSTRAR / OCULTAR PAINEL DE IMPORTAÇÃO
+// ==========================================
 function alternarVisibilidadeFicheiros() {
-    let box = document.getElementById("container-ficheiros-upload");
-    let btn = document.getElementById("btn-toggle-ficheiros");
-    if (box.style.display === "none") {
-        box.style.display = "block";
-        btn.innerText = "📂 Importar Planilhas / Ficheiros (Fechar)";
-        btn.style.background = "#dc3545";
+    let painel = document.getElementById("container-ficheiros-upload");
+    let botao = document.getElementById("btn-toggle-ficheiros");
+
+    if (!painel || !botao) return;
+
+    if (painel.style.display === "none" || painel.style.display === "") {
+        painel.style.display = "block";
+        botao.innerHTML = "📂 Importar Planilhas / Ficheiros (Fechar)";
     } else {
-        box.style.display = "none";
-        btn.innerText = "📂 Importar Planilhas / Ficheiros (Abrir)";
-        btn.style.background = "#495057";
+        painel.style.display = "none";
+        botao.innerHTML = "📂 Importar Planilhas / Ficheiros (Abrir)";
     }
 }
-
 // ==========================================
 // 5. MENU PRINCIPAL DO REPOSITOR (USUÁRIO)
 // ==========================================
 function voltarMenuPrincipal() {
-    if (html5QrcodeScanner) { 
-        try { html5QrcodeScanner.clear(); } catch(e) {} 
+    if (html5QrcodeScanner) {
+        try {
+            html5QrcodeScanner.clear();
+        } catch(e) {}
     }
 
-    document.querySelector(".container").innerHTML = `
+    let container = document.querySelector(".container");
+    if (!container) return;
+
+    container.innerHTML = `
         <div class="topo">
             <h1>🛒 GÔNDOLA OK</h1>
             <p>Operador: <strong>${usuarioAtual || "Não Identificado"}</strong></p>
@@ -339,23 +384,44 @@ function voltarMenuPrincipal() {
 
         <div class="login">
             <h2>Selecione seu Setor</h2>
+
             <button onclick="prepararMissaoSetor('Mercearia Bebidas')">🥤 Mercearia Bebidas</button>
             <button onclick="prepararMissaoSetor('Mercearia Doce')">🍬 Mercearia Doce</button><br><br>
+
             <button onclick="prepararMissaoSetor('Mercearia Conservas')">🥫 Mercearia Conservas</button><br><br>
+
             <button onclick="prepararMissaoSetor('Mercearia Alto Giro')">🔄 Mercearia Alto Giro</button><br><br>
+
             <button onclick="prepararMissaoSetor('Mercearia Limpeza')">🧴 Mercearia Limpeza</button><br><br>
+
             <button onclick="prepararMissaoSetor('Frios Iogurte')">🥛 Frios Iogurte</button><br><br>
+
             <button onclick="prepararMissaoSetor('Frios Congelados')">🧊 Frios Congelados</button><br><br>
+
             <button onclick="prepararMissaoSetor('Açougue')">🥩 Açougue</button><br><br>
+
             <button onclick="prepararMissaoSetor('Padaria')">🍞 Padaria</button>
-            
+
             <hr style="margin:20px 0; border:0; border-top:1px solid #ccc;">
-            
+
             <h2>Serviços de Apoio</h2>
-            <button onclick="abrirMenuChecklistsGerente()" style="background:#6f42c1; color:white; margin-bottom: 10px;">📋 Checklist Operacional</button>
-            <button onclick="abrirAbaValidade()" style="background:#20c997; color:white;">📅 Verificar Validade (Base Global)</button>
-            <button onclick="abrirAbaEtiquetas()" style="background:#ffc107; color:black;">🏷️ Etiquetas Pendentes</button>
-            <button onclick="mostrarTelaLoginInicial()" style="background:#6c757d; color:white; margin-top: 15px;">⬅️ Sair do App</button>
+
+            <button onclick="abrirAbaValidade()" style="background:#20c997; color:white;">
+                📅 Verificar Validade (Base Global)
+            </button>
+
+            <!-- NOVO BOTÃO: COLETOR DE ETIQUETAS AVULSO -->
+            <button onclick="abrirColetorEtiquetas()" style="background:#f0ad4e; color:white; margin-top:10px;">
+                🏷️ Coletor de Etiquetas Avulso
+            </button>
+
+            <button onclick="abrirAbaEtiquetas()" style="background:#ffc107; color:black; margin-top:10px;">
+                🏷️ Etiquetas Pendentes
+            </button>
+
+            <button onclick="mostrarTelaLoginInicial()" style="background:#6c757d; color:white; margin-top:20px;">
+                ⬅️ Sair do App
+            </button>
         </div>
     `;
 }
@@ -389,14 +455,18 @@ function prepararMissaoSetor(setor) {
 // 7. CHECKLIST INTERATIVO DE LOJA
 // ==========================================
 function mostrarProdutoAtual() {
+
+    let container = document.querySelector(".container");
+    if (!container) return;
+
     if (indiceAtual >= produtosDoDia.length) {
-        mostrarTelaValidacaoMissao(); 
+        mostrarTelaValidacaoMissao();
         return;
     }
 
     let produto = produtosDoDia[indiceAtual];
 
-    document.querySelector(".container").innerHTML = `
+    container.innerHTML = `
     <div class="topo">
         <h1>🛒 GÔNDOLA OK</h1>
         <p>${setorSelecionado} (${indiceAtual + 1}/${produtosDoDia.length})</p>
@@ -408,18 +478,34 @@ function mostrarProdutoAtual() {
         <br>
 
         <h3>O produto está abastecido?</h3>
-        <button id="btn-abs-sim" onclick="respostaAbastecido(true)" style="background-color: #e0e0e0; color: black; margin-bottom:8px;">🟢 SIM</button>
-        <button id="btn-abs-nao" onclick="respostaAbastecido(false)" style="background-color: #e0e0e0; color: black; margin-bottom:8px;">🔴 NÃO</button>
+
+        <button id="btn-abs-sim" onclick="respostaAbastecido(true)" style="background:#e0e0e0;color:black;margin-bottom:8px;">
+            🟢 SIM
+        </button>
+
+        <button id="btn-abs-nao" onclick="respostaAbastecido(false)" style="background:#e0e0e0;color:black;margin-bottom:8px;">
+            🔴 NÃO
+        </button>
+
         <br><br>
 
-        <div id="bloco-preco" style="display: none;">
+        <div id="bloco-preco" style="display:none;">
             <h3>Está precificado?</h3>
-            <button id="btn-prc-sim" onclick="respostaPrecificado(true)" style="background-color: #e0e0e0; color: black; margin-bottom:8px;">🟢 SIM</button>
-            <button id="btn-prc-nao" onclick="respostaPrecificado(false)" style="background-color: #e0e0e0; color: black; margin-bottom:8px;">🔴 NÃO</button>
+
+            <button id="btn-prc-sim" onclick="respostaPrecificado(true)" style="background:#e0e0e0;color:black;margin-bottom:8px;">
+                🟢 SIM
+            </button>
+
+            <button id="btn-prc-nao" onclick="respostaPrecificado(false)" style="background:#e0e0e0;color:black;margin-bottom:8px;">
+                🔴 NÃO
+            </button>
+
             <br><br>
         </div>
 
-        <button id="btn-proximo" style="display: none; background-color: #28a745; color: white; width: 100%; padding: 10px;" onclick="proximoProduto()">➡️ Avançar</button>
+        <button id="btn-proximo" style="display:none;background:#28a745;color:white;width:100%;padding:10px;" onclick="proximoProduto()">
+            ➡️ Avançar
+        </button>
     </div>
     `;
 }
@@ -430,13 +516,14 @@ function respostaAbastecido(valor) {
 
     document.getElementById("btn-abs-sim").style.background = valor ? "#28a745" : "#e0e0e0";
     document.getElementById("btn-abs-sim").style.color = valor ? "white" : "black";
+
     document.getElementById("btn-abs-nao").style.background = !valor ? "#dc3545" : "#e0e0e0";
     document.getElementById("btn-abs-nao").style.color = !valor ? "white" : "black";
 
     let blocoPreco = document.getElementById("bloco-preco");
     let btnProximo = document.getElementById("btn-proximo");
 
-    if (valor === true) {
+    if (valor) {
         produto.statusRuptura = false;
         blocoPreco.style.display = "block";
         btnProximo.style.display = "none";
@@ -454,6 +541,7 @@ function respostaPrecificado(valor) {
 
     document.getElementById("btn-prc-sim").style.background = valor ? "#28a745" : "#e0e0e0";
     document.getElementById("btn-prc-sim").style.color = valor ? "white" : "black";
+
     document.getElementById("btn-prc-nao").style.background = !valor ? "#dc3545" : "#e0e0e0";
     document.getElementById("btn-prc-nao").style.color = !valor ? "white" : "black";
 
@@ -461,9 +549,7 @@ function respostaPrecificado(valor) {
 }
 
 function proximoProduto() {
-    // Grava as definições atuais do produto na memória interna antes de mudar o índice
     produtosDoDia[indiceAtual] = { ...produtosDoDia[indiceAtual] };
-    
     indiceAtual++;
     mostrarProdutoAtual();
 }
@@ -482,23 +568,31 @@ function mostrarTelaValidacaoMissao() {
             <h1>📋 REVISÃO DA MISSÃO</h1>
             <p>${setorSelecionado}</p>
         </div>
-        <div class="login" style="max-width: 100%; text-align: left;">
-            <div style="background: #e9ecef; padding: 12px; border-radius: 5px; margin-bottom: 15px; font-size: 14px; line-height: 1.6;">
+
+        <div class="login" style="max-width:100%; text-align:left;">
+
+            <div style="background:#e9ecef;padding:12px;border-radius:5px;margin-bottom:15px;font-size:14px;line-height:1.6;">
                 📊 <strong>Resumo dos Itens Verificados:</strong><br>
-                📦 Total de Itens: <strong>${total}</strong><br>
-                🟢 Abastecidos (OK): <strong style="color: green;">${abastecidos}</strong><br>
-                🔴 Rupturas Identificadas: <strong style="color: red;">${rupturas}</strong><br>
-                🏷️ Produtos Sem Etiqueta de Preço: <strong style="color: #fd7e14;">${semPreco}</strong>
+                📦 Total: <strong>${total}</strong><br>
+                🟢 Abastecidos: <strong style="color:green;">${abastecidos}</strong><br>
+                🔴 Rupturas: <strong style="color:red;">${rupturas}</strong><br>
+                🏷️ Sem Preço: <strong style="color:#fd7e14;">${semPreco}</strong>
             </div>
 
-            <p style="font-size:12px; color:#6c757d; text-align:center; margin-bottom:15px;">
-                ⚠️ Se houver alguma divergência, você pode cancelar e reiniciar. Caso contrário, confirme a gravação.
+            <p style="font-size:12px;color:#6c757d;text-align:center;margin-bottom:15px;">
+                ⚠️ Confira as informações antes de gravar.
             </p>
 
-            <div style="display: flex; gap: 10px;">
-                <button onclick="finalizarEGravarMissao()" style="background-color: #28a745; color: white; width: 60%; font-weight: bold; padding:12px;">✅ Confirmar e Gravar</button>
-                <button onclick="if(confirm('Deseja cancelar esta amostragem? Os dados atuais serão perdidos.')) voltarMenuPrincipal()" style="background-color: #dc3545; color: white; width: 40%; padding:12px;">❌ Cancelar</button>
+            <div style="display:flex;gap:10px;">
+                <button onclick="finalizarEGravarMissao()" style="background:#28a745;color:white;width:60%;padding:12px;font-weight:bold;">
+                    ✅ Confirmar e Gravar
+                </button>
+
+                <button onclick="if(confirm('Deseja cancelar esta amostragem?')) voltarMenuPrincipal()" style="background:#dc3545;color:white;width:40%;padding:12px;">
+                    ❌ Cancelar
+                </button>
             </div>
+
         </div>
     `;
 }
@@ -762,7 +856,6 @@ function abrirMenuSetoresGerente() {
         </div>
     `;
 }
-
 // ==========================================
 // 13. GERENTE: FILA WITH ITENS COM RUPTURA ATIVA
 // ==========================================
@@ -1042,6 +1135,192 @@ function verDetalhesMissao(idSessao) {
 }
 
 // ==========================================
+// 13.6. HISTÓRICO DE TRATATIVAS (CLICÁVEL POR DATA)
+// ==========================================
+function abrirHistoricoTratativasGerente(dataFiltro = null) {
+    let historico = JSON.parse(localStorage.getItem("gondola_historico_tratativas")) || [];
+    let hojeStr = new Date().toLocaleDateString();
+    
+    let dataAlvo = hojeStr;
+    if (dataFiltro) {
+        let partes = dataFiltro.split("-");
+        dataAlvo = `${partes[2]}/${partes[1]}/${partes[0]}`;
+    }
+
+    let container = document.querySelector(".container");
+    if (!container) return;
+
+    let historicoFiltrado = historico.filter(t => t.dataTratativa === dataAlvo);
+
+    let linhasHtml = "";
+    if (historicoFiltrado.length === 0) {
+        linhasHtml = `<p style="text-align:center; color:#777; padding:30px; background:white; border-radius:4px;">Nenhuma tratativa resolvida nesta data (${dataAlvo}).</p>`;
+    } else {
+        let historicoInvertido = [...historicoFiltrado].reverse(); 
+        historicoInvertido.forEach(t => {
+            linhasHtml += `
+                <div style="background: white; border: 1px solid #dee2e6; border-radius: 6px; padding: 12px; margin-bottom: 10px; border-left: 5px solid #28a745; text-align:left;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px; border-bottom: 1px solid #f8f9fa; padding-bottom:4px;">
+                        <span style="font-size:11px; background:#e8f4fd; color:#0056b3; padding:2px 6px; border-radius:3px; font-weight:bold;">${t.setor}</span>
+                        <span style="font-size:11px; color:#6c757d;">🛠️ Resolvido às: ${t.horaTratativa}</span>
+                    </div>
+                    <p style="margin:0 0 6px 0; font-size:13px; color:#222;"><strong>${t.descricao}</strong> <small style="color:#666;">(${t.codigo})</small></p>
+                    <div style="font-size:11px; color:#495057; background:#f8f9fa; padding:6px; border-radius:4px; display:flex; flex-direction:column; gap:2px;">
+                        <span>❌ <strong>Ruptura:</strong> ${t.motivoRuptura}</span>
+                        <span>👤 <strong>Repositores:</strong> ${t.operadorOrigem} (Auditou em ${t.dataAuditoria})</span>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    let partesInput = dataAlvo.split("/");
+    let dataInputFormat = `${partesInput[2]}-${partesInput[1]}-${partesInput[0]}`;
+
+    container.innerHTML = `
+        <div class="topo">
+            <h1>📋 HISTÓRICO DE TRATATIVAS</h1>
+            <p>Tratativas do dia: <strong>${dataAlvo}</strong></p>
+        </div>
+        <div class="login" style="max-width: 100%; max-height: 70vh; overflow-y: auto; padding: 10px;">
+            
+            <div style="background:#e2e3e5; padding:10px; margin-bottom:15px; border-radius:4px; text-align:center;">
+                <label style="font-size:12px; font-weight:bold; color:#495057; display:block; margin-bottom:5px;">📅 CLIQUE ABAIXO PARA CONSULTAR OUTRA DATA:</label>
+                <input type="date" value="${dataInputFormat}" onchange="abrirHistoricoTratativasGerente(this.value)" style="padding:6px; font-size:14px; width:80%; max-width:200px; border:1px solid #ccc; border-radius:4px;">
+            </div>
+
+            <button onclick="exportarParaExcel('Historico_Tratativas_Geral', 'gondola_historico_tratativas')" style="width:100%; background:#6c757d; color:white; padding:8px; margin-bottom:15px; font-weight:bold;">📥 Exportar Todo o Histórico Mensal (Excel)</button>
+            ${linhasHtml}
+            <button onclick="abrirPainelAdmin()" style="background:#495057; color:white; width:100%; margin-top:15px;">⬅️ Voltar ao Painel</button>
+        </div>
+    `;
+}
+
+// ==========================================
+// 13.7. HISTÓRICO DE LEITURA DAS MISSÕES (CLICÁVEL POR DATA)
+// ==========================================
+function abrirHistoricoMissoesGerente(dataFiltro = null) {
+    let dados = JSON.parse(localStorage.getItem("gondola_dados")) || [];
+    let hojeStr = new Date().toLocaleDateString();
+    
+    let dataAlvo = hojeStr;
+    if (dataFiltro) {
+        let partes = dataFiltro.split("-");
+        dataAlvo = `${partes[2]}/${partes[1]}/${partes[0]}`;
+    }
+
+    let container = document.querySelector(".container");
+    if (!container) return;
+
+    let sessoesMapeadas = {};
+    dados.forEach(item => {
+        if (item.dataAuditoria === dataAlvo) {
+            let id = item.idSessaoMissao || (item.dataAuditoria + "_" + item.setor); 
+            if (!sessoesMapeadas[id]) {
+                sessoesMapeadas[id] = {
+                    idSessao: id,
+                    setor: item.setor,
+                    operador: item.operador || "Não Informado",
+                    data: item.dataAuditoria,
+                    hora: item.horaAuditoria || "--:--",
+                    produtos: []
+                };
+            }
+            sessoesMapeadas[id].produtos.push(item);
+        }
+    });
+
+    let listaSessoes = Object.values(sessoesMapeadas).reverse(); 
+
+    let linesHtml = "";
+    if (listaSessoes.length === 0) {
+        linesHtml = `<p style="text-align:center; color:#777; padding:20px;">Nenhuma amostragem de gôndola foi auditada em ${dataAlvo}.</p>`;
+    } else {
+        listaSessoes.forEach(s => {
+            let total = s.produtos.length;
+            let rupturas = s.produtos.filter(p => p.statusRuptura === true).length;
+            let semPreco = s.produtos.filter(p => p.precificado === false).length;
+            let conformes = total - rupturas;
+
+            linesHtml += `
+                <div onclick="verDetalhesMissao('${s.idSessao}')" style="background: white; border: 1px solid #dee2e6; border-radius: 6px; padding: 12px; margin-bottom: 10px; cursor: pointer; border-left: 5px solid #007bff; transition: 0.2s; text-align:left;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
+                        <strong style="color: #333; font-size:14px;">${s.setor}</strong>
+                        <span style="font-size:11px; color:#6c757d;">Horário: ${s.hora}</span>
+                    </div>
+                    <div style="font-size:12px; color:#495057; display:flex; justify-content:space-between;">
+                        <span>👤 Op: ${s.operador}</span>
+                        <span>🟢 ${conformes} | 🔴 Rup: ${rupturas} | 🏷️ Etq: ${semPreco}</span>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    let partesInput = dataAlvo.split("/");
+    let dataInputFormat = `${partesInput[2]}-${partesInput[1]}-${partesInput[0]}`;
+
+    container.innerHTML = `
+        <div class="topo">
+            <h1>📊 LEITURA DE MISSÕES</h1>
+            <p>Missões do dia: <strong>${dataAlvo}</strong></p>
+        </div>
+        <div class="login" style="max-width: 100%; max-height: 70vh; overflow-y: auto; padding: 10px;">
+            
+            <div style="background:#e2e3e5; padding:10px; margin-bottom:15px; border-radius:4px; text-align:center;">
+                <label style="font-size:12px; font-weight:bold; color:#495057; display:block; margin-bottom:5px;">📅 CLIQUE ABAIXO PARA CONSULTAR OUTRA DATA:</label>
+                <input type="date" value="${dataInputFormat}" onchange="abrirHistoricoMissoesGerente(this.value)" style="padding:6px; font-size:14px; width:80%; max-width:200px; border:1px solid #ccc; border-radius:4px;">
+            </div>
+
+            <button onclick="exportarParaExcel('Historico_Geral_Missoes', 'gondola_dados')" style="width:100%; background:#6c757d; color:white; padding:8px; margin-bottom:15px; font-weight:bold;">📥 Exportar Toda a Base Histórica (Excel)</button>
+            ${linesHtml}
+            <button onclick="abrirPainelAdmin()" style="background:#495057; color:white; width:100%; margin-top:15px;">⬅️ Voltar ao Painel</button>
+        </div>
+    `;
+}
+
+function verDetalhesMissao(idSessao) {
+    let dados = JSON.parse(localStorage.getItem("gondola_dados")) || [];
+    let produtosSessao = dados.filter(p => (p.idSessaoMissao == idSessao || (p.dataAuditoria + "_" + p.setor) == idSessao));
+    if (produtosSessao.length === 0) return;
+
+    let infoBase = produtosSessao[0];
+    let container = document.querySelector(".container");
+
+    let itensHtml = "";
+    produtosSessao.forEach((p, index) => {
+        let absBadge = p.abastecido ? `<span style="color:green; font-weight:bold;">🟢 Abastecido</span>` : `<span style="color:red; font-weight:bold;">🔴 RUPTURA</span>`;
+        let prcBadge = p.precificado === true ? `| Preço: <span style="color:green;">🟢 OK</span>` : (p.precificado === false ? `| Preço: <span style="color:red; font-weight:bold;">🔴 SEM ETIQUETA</span>` : `| Preço: <span style="color:gray;">⚠️ N/A</span>`);
+        let tratativa = p.finalizacaoGerente ? `<br><span style="color:#28a745; font-size:11px;">🛠️ Solução: <strong>${p.finalizacaoGerente}</strong></span>` : "";
+
+        itensHtml += `
+            <div style="padding: 10px 0; border-bottom: 1px solid #eee; font-size: 13px;">
+                <p style="margin: 0 0 5px 0;"><strong>${index + 1}. ${p.descricao}</strong> <small style="color:#777;">(${p.codigo})</small></p>
+                <div style="background:#f8f9fa; padding:6px; border-radius:4px; font-size:12px;">
+                    ${absBadge} ${prcBadge}
+                    ${tratativa}
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = `
+        <div class="topo">
+            <h1>📋 DETALHES DA MISSÃO</h1>
+            <p>${infoBase.setor}</p>
+        </div>
+        <div class="login" style="max-width: 100%; max-height: 70vh; overflow-y: auto; text-align:left; padding: 15px;">
+            <div style="background:#e9ecef; padding:8px; border-radius:4px; font-size:12px; margin-bottom:15px; color:#495057;">
+                👤 <strong>Operador:</strong> ${infoBase.operador || "Não Informado"}<br>
+                📅 <strong>Data:</strong> ${infoBase.dataAuditoria} às ${infoBase.horaAuditoria || "--:--"}<br>
+            </div>
+            ${itensHtml}
+            <button onclick="abrirHistoricoMissoesGerente()" style="background:#6c757d; color:white; width:100%; margin-top:20px;">⬅️ Voltar ao Histórico</button>
+        </div>
+    `;
+}
+
+// ==========================================
 // 14. GERENTE: MENU EXCLUSIVO DE CHECKLISTS
 // ==========================================
 function abrirMenuChecklistsGerente() {
@@ -1109,75 +1388,6 @@ window.gerarEtiquetasCodigoBarras = function(lista) {
     janela.document.close();
 };
 
-// ==========================================
-// 16. CONTROLE DE EXIBIÇÃO E FILTRO DO CHECKLIST
-// ==========================================
-let perguntasAtivasChecklist = []; 
-
-function abrirChecklistSetor(setor) {
-    let todasPerguntas = JSON.parse(localStorage.getItem("gondola_checklist_config")) || [];
-    let perguntasDoSetor = todasPerguntas.filter(p => p.setor.toLowerCase() === setor.toLowerCase());
-
-    let hoje = new Date();
-    let diaDaSemana = hoje.getDay(); 
-    let diaDoChecklistCompleto = 0; 
-    let modoVisualizacao = "";
-
-    if (diaDaSemana === diaDoChecklistCompleto) {
-        perguntasAtivasChecklist = perguntasDoSetor;
-        modoVisualizacao = "🔥 COMPLETO DE DOMINGO";
-    } else {
-        perguntasAtivasChecklist = perguntasDoSetor.filter(p => p.diaria === true);
-        modoVisualizacao = "⚡ MISSÃO DIÁRIA RÁPIDA";
-    }
-
-    let container = document.querySelector(".container");
-    if (!container) return;
-
-    if (perguntasAtivasChecklist.length === 0) {
-        container.innerHTML = `
-            <div class="topo"><h1>📋 ${setor}</h1></div>
-            <div class="login" style="text-align: center;">
-                <p style="color: #856404; background: #fff3cd; padding: 10px; border-radius: 5px;">
-                    ⚠️ Nenhuma pergunta ativa para este setor hoje (${modoVisualizacao}).
-                </p>
-                <button onclick="abrirMenuChecklistsGerente()" style="background:#6c757d; color:white; width: 100%; margin-top: 15px;">Voltar</button>
-            </div>
-        `;
-        return;
-    }
-
-    let htmlPerguntas = "";
-    perguntasAtivasChecklist.forEach((p, index) => {
-        htmlPerguntas += `
-            <div style="margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid #e9ecef;">
-                <label style="display: block; margin-bottom: 6px; font-size: 14px;">
-                    <strong>${index + 1}.</strong> ${p.pergunta}
-                </label>
-                <select id="resp-checklist-${p.id}" style="width: 100%; padding: 8px; font-size: 14px; border: 1px solid #ced4da; border-radius: 4px; background: #fff;">
-                    <option value="OK">🟢 OK</option>
-                    <option value="NAO_CONFORME">🔴 Não Conforme</option>
-                    <option value="NA">⚠️ N/A</option>
-                </select>
-                <input type="text" id="obs-checklist-${p.id}" placeholder="Observação (opcional)..." style="width: 100%; padding: 6px; font-size: 12px; margin-top: 5px; border: 1px solid #e9ecef; border-radius: 4px;">
-            </div>
-        `;
-    });
-
-    container.innerHTML = `
-        <div class="topo">
-            <h1>📋 ${setor}</h1>
-            <p style="font-size:11px; margin-top:-5px; color:#fff; opacity:0.8;">Foco de hoje: <strong>${modoVisualizacao}</strong> (${perguntasAtivasChecklist.length} itens)</p>
-        </div>
-        <div class="login" style="text-align: left; max-width: 100%; max-height: 65vh; overflow-y: auto;">
-            ${htmlPerguntas}
-            <div style="display: flex; gap: 10px; margin-top: 20px;">
-                <button onclick="salvarRespostasChecklist('${setor}')" style="background:#28a745; color:white; width:50%;">Gravar</button>
-                <button onclick="abrirMenuChecklistsGerente()" style="background:#6c757d; color:white; width:50%;">Voltar</button>
-            </div>
-        </div>
-    `;
-}
 
 // ==========================================
 // 17. GRAVAÇÃO DAS RESPOSTAS DO CHECKLIST
@@ -1186,154 +1396,702 @@ function salvarRespostasChecklist(nomeSetor) {
     let historicoChecklists = JSON.parse(localStorage.getItem("gondola_historico_checklists")) || [];
     let dataAtual = new Date().toLocaleDateString();
     let horaAtual = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    
-    let novasRespostas = [];
 
-    perguntasAtivasChecklist.forEach(p => {
-        let elResposta = document.getElementById(`resp-checklist-${p.id}`);
-        let elObservacao = document.getElementById(`obs-checklist-${p.id}`);
-        
-        if (elResposta) {
-            novasRespostas.push({
-                perguntaId: p.id,
-                perguntaTexto: p.pergunta,
-                resposta: elResposta.value, 
-                observacao: elObservacao ? elObservacao.value.trim() : ""
-            });
-        }
-    });
+    let novasRespostas = [];
+    if (typeof perguntasAtivasChecklist !== 'undefined') {
+        perguntasAtivasChecklist.forEach(p => {
+            let elResposta = document.getElementById(`resp-checklist-${p.id}`);
+            let elObservacao = document.getElementById(`obs-checklist-${p.id}`);
+            if (elResposta) {
+                novasRespostas.push({
+                    perguntaId: p.id,
+                    perguntaTexto: p.pergunta,
+                    resposta: elResposta.value,
+                    observacao: elObservacao ? elObservacao.value.trim() : ""
+                });
+            }
+        });
+    }
 
     if (novasRespostas.length === 0) {
         alert("Nenhuma resposta coletada.");
         return;
     }
 
-    let registroSessao = {
+    historicoChecklists.push({
         idSessao: Date.now(),
         setor: nomeSetor,
-        usuario: usuarioAtual || "Administrador",
+        usuario: typeof usuarioAtual !== 'undefined' ? usuarioAtual : "Administrador",
         data: dataAtual,
         hora: horaAtual,
         itensRespondidos: novasRespostas
-    };
+    });
 
-    historicoChecklists.push(registroSessao);
     localStorage.setItem("gondola_historico_checklists", JSON.stringify(historicoChecklists));
-
-    alert(`📋 Checklist de [${nomeSetor}] saved successfully!`);
+    alert(`✅ Checklist do setor "${nomeSetor}" gravado com sucesso!`);
     abrirMenuChecklistsGerente();
 }
 
 // ==========================================
-// 18. ABA: LEITURA DO HISTÓRICO DE CHECKLISTS (CLICÁVEL POR DATA)
+// 18. HISTÓRICO DE CHECKLISTS
 // ==========================================
 function abrirHistoricoChecklistsGerente(dataFiltro = null) {
     let historico = JSON.parse(localStorage.getItem("gondola_historico_checklists")) || [];
-    let hojeStr = new Date().toLocaleDateString();
-    
-    let dataAlvo = hojeStr;
+    let dataSelecionada = new Date().toLocaleDateString();
+
     if (dataFiltro) {
-        let partes = dataFiltro.split("-");
-        dataAlvo = `${partes[2]}/${partes[1]}/${partes[0]}`;
+        let p = dataFiltro.split("-");
+        dataSelecionada = `${p[2]}/${p[1]}/${p[0]}`;
     }
 
-    let container = document.querySelector(".container");
-    if (!container) return;
+    let lista = historico.filter(item => item.data === dataSelecionada).sort((a,b)=>b.idSessao-a.idSessao);
+    let html = lista.length === 0 ? '<div style="padding:25px;text-align:center;color:#666;">Nenhum checklist encontrado nesta data.</div>' : "";
 
-    let historicoFiltrado = historico.filter(s => s.data === dataAlvo);
-
-    let linhasHtml = "";
-    if (historicoFiltrado.length === 0) {
-        linhasHtml = `<p style="text-align:center; color:#777; padding:20px;">Nenhum checklist foi respondido nesta data (${dataAlvo}).</p>`;
-    } else {
-        let historicoInvertido = [...historicoFiltrado].reverse();
-        historicoInvertido.forEach(sessao => {
-            let total = sessao.itensRespondidos.length;
-            let oks = sessao.itensRespondidos.filter(r => r.resposta === "OK").length;
-            let naos = sessao.itensRespondidos.filter(r => r.resposta === "NAO_CONFORME").length;
-
-            linhasHtml += `
-                <div onclick="verDetalhesChecklist(${sessao.idSessao})" style="background: white; border: 1px solid #dee2e6; border-radius: 6px; padding: 12px; margin-bottom: 10px; cursor: pointer; border-left: 5px solid #6f42c1; transition: 0.2s; text-align:left;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
-                        <strong style="color: #333; font-size:14px;">${sessao.setor}</strong>
-                        <span style="font-size:11px; color:#6c757d;">Horário: ${sessao.hora}</span>
-                    </div>
-                    <div style="font-size:12px; color:#495057; display:flex; justify-content:space-between;">
-                        <span>👤 Resp: ${sessao.usuario}</span>
-                        <span>🟢 ${oks} | 🔴 ${naos} | 📦 Itens: ${total}</span>
-                    </div>
-                </div>
-            `;
-        });
-    }
-
-    let partesInput = dataAlvo.split("/");
-    let dataInputFormat = `${partesInput[2]}-${partesInput[1]}-${partesInput[0]}`;
-
-    container.innerHTML = `
-        <div class="topo">
-            <h1>📋 HISTÓRICO DE CHECKLISTS</h1>
-            <p>Vistorias do dia: <strong>${dataAlvo}</strong></p>
-        </div>
-        <div class="login" style="max-width: 100%; max-height: 70vh; overflow-y: auto; padding: 10px;">
-            
-            <div style="background:#e2e3e5; padding:10px; margin-bottom:15px; border-radius:4px; text-align:center;">
-                <label style="font-size:12px; font-weight:bold; color:#495057; display:block; margin-bottom:5px;">📅 CLIQUE ABAIXO PARA CONSULTAR OUTRA DATA:</label>
-                <input type="date" value="${dataInputFormat}" onchange="abrirHistoricoChecklistsGerente(this.value)" style="padding:6px; font-size:14px; width:80%; max-width:200px; border:1px solid #ccc; border-radius:4px;">
-            </div>
-
-            <button onclick="exportarParaExcel('Historico_Checklists_Completo', 'gondola_historico_checklists')" style="width:100%; background:#6c757d; color:white; padding:8px; margin-bottom:15px; font-weight:bold;">📥 Exportar Todos os Meses (Excel)</button>
-            ${linhasHtml}
-            <button onclick="abrirPainelAdmin()" style="background:#495057; color:white; width:100%; margin-top:15px;">⬅️ Voltar ao Painel</button>
-        </div>
-    `;
-}
-
-// ==========================================
-// 19. DETALHES DO CHECKLIST SELECIONADO
-// ==========================================
-function verDetalhesChecklist(idSessao) {
-    let historico = JSON.parse(localStorage.getItem("gondola_historico_checklists")) || [];
-    let sessao = historico.find(s => s.idSessao === idSessao);
-    
-    let container = document.querySelector(".container");
-    if (!container || !sessao) return;
-
-    let itensHtml = "";
-    sessao.itensRespondidos.forEach((item, index) => {
-        let badge = "";
-        if (item.resposta === "OK") badge = `<span style="color:green; font-weight:bold;">🟢 OK</span>`;
-        if (item.resposta === "NAO_CONFORME") badge = `<span style="color:red; font-weight:bold;">🔴 NÃO CONFORME</span>`;
-        if (item.resposta === "NA") badge = `<span style="color:orange; font-weight:bold;">⚠️ N/A</span>`;
-
-        itensHtml += `
-            <div style="padding: 10px 0; border-bottom: 1px solid #eee; font-size: 13px;">
-                <p style="margin: 0 0 5px 0;"><strong>${index + 1}. ${item.perguntaTexto}</strong></p>
-                <div style="display:flex; justify-content:space-between; align-items:center; background:#f8f9fa; padding:6px; border-radius:4px;">
-                    <span>Status: ${badge}</span>
-                    ${item.observacao ? `<span style="font-style:italic; font-size:11px; color:#555; max-width:60%; text-align:right;">💬 "${item.observacao}"</span>` : ""}
-                </div>
+    lista.forEach(sessao => {
+        let itens = sessao.itensRespondidos || [];
+        let ok = itens.filter(i=>i.resposta==="OK").length;
+        let nc = itens.filter(i=>i.resposta==="NAO_CONFORME").length;
+        
+        html += `
+            <div onclick="verDetalhesChecklist('${sessao.idSessao}')" style="background:white;border-left:5px solid #6f42c1;padding:12px;margin-bottom:10px;border-radius:6px;cursor:pointer;">
+                <strong>${sessao.setor}</strong><br>
+                <small>👤 ${sessao.usuario} | 🕒 ${sessao.hora}</small>
+                <hr>
+                🟢 ${ok} &nbsp;&nbsp; 🔴 ${nc} &nbsp;&nbsp; 📋 ${itens.length}
             </div>
         `;
     });
 
-    container.innerHTML = `
-        <div class="topo">
-            <h1>📊 DETALHES DA VISTORIA</h1>
-            <p>${sessao.setor} | Por: ${sessao.usuario}</p>
-        </div>
-        <div class="login" style="max-width: 100%; max-height: 70vh; overflow-y: auto; text-align:left; padding: 15px;">
-            <div style="background:#e9ecef; padding:8px; border-radius:4px; font-size:12px; margin-bottom:15px; color:#495057;">
-                📅 <strong>Data:</strong> ${sessao.data} às ${sessao.hora}<br>
-                🆔 <strong>ID da Sessão:</strong> ${sessao.idSessao}
-            </div>
-            ${itensHtml}
-            <button onclick="abrirHistoricoChecklistsGerente()" style="background:#6c757d; color:white; width:100%; margin-top:20px;">⬅️ Voltar ao Histórico</button>
+    let d = dataSelecionada.split("/");
+    document.querySelector(".container").innerHTML = `
+        <div class="topo"><h1>📋 HISTÓRICO</h1></div>
+        <div class="login">
+            <input type="date" value="${d[2]}-${d[1]}-${d[0]}" onchange="abrirHistoricoChecklistsGerente(this.value)">
+            <button onclick="exportarParaExcel('Historico_Checklists','gondola_historico_checklists')">📥 Exportar Excel</button>
+            ${html}
+            <button onclick="abrirPainelAdmin()">⬅️ Voltar</button>
         </div>
     `;
 }
 
 // ==========================================
-// EXECUÇÃO INICIAL
+// 19. DETALHES DO CHECKLIST
 // ==========================================
-mostrarTelaLoginInicial();
+function verDetalhesChecklist(idSessao){
+    let historico = JSON.parse(localStorage.getItem("gondola_historico_checklists")) || [];
+    let sessao = historico.find(s => String(s.idSessao) === String(idSessao));
+    if(!sessao) return;
+
+    let html = sessao.itensRespondidos.map((item, index) => `
+        <div style="padding:10px;border-bottom:1px solid #ddd;">
+            <strong>${index+1}. ${item.perguntaTexto}</strong><br>
+            <strong>${item.resposta === "OK" ? "🟢 OK" : "🔴 NÃO CONFORME"}</strong>
+            ${item.observacao ? `<br><small>💬 ${item.observacao}</small>` : ""}
+        </div>
+    `).join("");
+
+    document.querySelector(".container").innerHTML = `
+        <div class="topo"><h1>${sessao.setor}</h1></div>
+        <div class="login">
+            <p><strong>Responsável:</strong> ${sessao.usuario} | <strong>Data:</strong> ${sessao.data}</p>
+            <hr>${html}
+            <button onclick="abrirHistoricoChecklistsGerente()">⬅️ Voltar</button>
+        </div>
+    `;
+}
+
+// ==========================================================
+// FUNÇÃO ACIONADA PELO BOTÃO DA TELA DE GESTÃO (CICLO EVOLUTIVO DE 6 DIAS)
+// ==========================================================
+let indiceMissaoAtual = 0;
+let perguntasMissao = [];
+
+function abrirMenuChecklistsGerente() {
+    // Controle do Ciclo de Dias (1 a 6)
+    let diaDoCiclo = parseInt(localStorage.getItem("gondola_ciclo_checklist_dia")) || 1;
+
+    // ==========================================
+    // REGRA DO 6º DIA: DIA DA GESTÃO OPERACIONAL
+    // ==========================================
+    if (diaDoCiclo >= 6) {
+        renderizarDiaDaGestao();
+        return;
+    }
+
+    // Carrega a base da planilha para os dias com perguntas (Dias 1 a 5)
+    let basePlanilha = JSON.parse(localStorage.getItem("gondola_checklist_config")) || [];
+    let perguntas = basePlanilha.filter(p => p.diaria === true);
+
+    if (perguntas.length === 0) {
+        alert("⚠️ Nenhuma pergunta diária encontrada! Importe a planilha primeiro.");
+        return;
+    }
+
+    // ==========================================
+    // REGRA DO 5º DIA: CHECKLIST GLOBAL (TODAS)
+    // ==========================================
+    if (diaDoCiclo === 5) {
+        alert("📢 DIA DO CHECKLIST GLOBAL: Hoje a auditoria será COMPLETA (todas as perguntas da planilha) para preparar o diagnóstico da loja!");
+        perguntas.sort(() => Math.random() - 0.5);
+    } 
+    // ==========================================
+    // REGRA DO 1º AO 4º DIA: ROTINA AMOSTRAL (15)
+    // ==========================================
+    else {
+        perguntas.sort(() => Math.random() - 0.5);
+        if (perguntas.length > 15) {
+            perguntas = perguntas.slice(0, 15);
+        }
+    }
+
+    // Organiza por setor para otimizar o deslocamento na área de vendas
+    perguntas.sort((a, b) => a.setor.localeCompare(b.setor));
+
+    perguntasMissao = perguntas;
+    indiceMissaoAtual = 0;
+
+    renderizarPerguntaDoChecklist();
+}
+
+// --- TELA EXCLUSIVA DO 6º DIA (APÓS O GLOBAL) ---
+function renderizarDiaDaGestao() {
+    let container = document.querySelector(".container");
+    if (!container) return;
+
+    container.innerHTML = `
+        <div class="topo" style="background:#4b13b3;">
+            <h1>📊 DIA DA GESTÃO OPERACIONAL</h1>
+            <p>Foco Estratégico e Auditoria de Indicadores</p>
+        </div>
+
+        <div style="padding: 15px; text-align: center;">
+            <div style="background: #f3f0ff; border-left: 5px solid #6f42c1; padding: 15px; border-radius: 6px; text-align: left; margin-bottom: 20px;">
+                <h3 style="color: #4b13b3; margin-top: 0; font-size: 16px;">🎯 Diagnóstico Estratégico da Loja:</h3>
+                <p style="font-size: 14px; color: #333; line-height: 1.5; margin: 5px 0;">
+                    Hoje é o <strong>Dia da Gestão</strong>. Com base no Checklist Global realizado ontem, utilize este turno para:
+                </p>
+                <ul style="font-size: 13px; color: #444; padding-left: 20px; line-height: 1.6;">
+                    <li>Analise o comportamento da loja/missões e veja quais as pendências acumuladas.</li>
+                    <li>Mapeie os gargalos operacionais e defina os planos de ação com os encarregados.</li>
+                    <li>Monitore os relatórios de ruptura para ajustar a reposição.</li>
+                </ul>
+            </div>
+
+            <button onclick="salvarDiaDaGestaoNoHist()" style="width:100%; padding:16px; background:#6f42c1; color:white; border:none; border-radius:6px; font-size:16px; font-weight:bold; cursor:pointer;">
+                ✅ Concluir Análise de Gestão
+            </button>
+
+            <button onclick="location.reload()" style="width:100%; padding:12px; background:#6c757d; color:white; border:none; border-radius:6px; font-size:14px; margin-top: 15px; cursor:pointer;">
+                ↩ Voltar ao Menu
+            </button>
+        </div>
+    `;
+}
+
+function renderizarPerguntaDoChecklist() {
+    let container = document.querySelector(".container");
+    if (!container) return;
+
+    let p = perguntasMissao[indiceMissaoAtual];
+    let diaDoCiclo = parseInt(localStorage.getItem("gondola_ciclo_checklist_dia")) || 1;
+    
+    // Identificação visual na barra superior
+    let tituloTopo = diaDoCiclo === 5 ? "📢 CHECKLIST GLOBAL" : "📋 CHECKLIST OPERACIONAL";
+    let subTitulo = diaDoCiclo === 5 ? "Auditoria Integral de Preparação" : `Auditoria Amostral - Dia ${diaDoCiclo} de 4`;
+    let corTopo = diaDoCiclo === 5 ? "#e67e22" : "#6f42c1"; // Laranja para destacar o dia Global
+
+    container.innerHTML = `
+        <div class="topo" style="background:${corTopo};">
+            <h1>${tituloTopo}</h1>
+            <p>${subTitulo}</p>
+        </div>
+
+        <div style="text-align:center;padding:10px;">
+            <p style="font-size:11px;color:#666;margin-bottom:5px;">
+                Item ${indiceMissaoAtual + 1} de ${perguntasMissao.length}
+            </p>
+            <p style="font-size:13px;font-weight:bold;color:${corTopo};margin-bottom:20px;text-transform:uppercase;">
+                📍 Setor: ${p.setor}
+            </p>
+            <div style="font-size:17px;font-weight:bold;margin-bottom:25px;min-height:60px;display:flex;align-items:center;justify-content:center;line-height:1.4;color:#333;">
+                "${p.pergunta}"
+            </div>
+
+            <button onclick="salvarRespostaPasso('SIM')" style="width:100%;padding:16px;background:#28a745;color:white;border:none;border-radius:6px;margin-bottom:12px;font-size:16px;font-weight:bold;cursor:pointer;">
+                🟢 SIM (CONFORME)
+            </button>
+            <button onclick="salvarRespostaPasso('NÃO')" style="width:100%;padding:16px;background:#dc3545;color:white;border:none;border-radius:6px;font-size:16px;font-weight:bold;cursor:pointer;">
+                🔴 NÃO CONFORME
+            </button>
+            <button onclick="location.reload()" style="width:100%;padding:12px;background:#6c757d;color:white;border:none;border-radius:6px;font-size:14px;margin-top:15px;cursor:pointer;">
+                ↩ Cancelar e Sair
+            </button>
+        </div>
+    `;
+}
+
+function salvarRespostaPasso(resposta) {
+    let perguntaAtual = perguntasMissao[indiceMissaoAtual];
+    let respostas = JSON.parse(localStorage.getItem("gondola_respostas_checklist_atual")) || [];
+
+    respostas.push({
+        perguntaTexto: perguntaAtual.pergunta,
+        setor: perguntaAtual.setor,
+        resposta: resposta === "SIM" ? "OK" : "NAO_CONFORME",
+        observacao: ""
+    });
+
+    localStorage.setItem("gondola_respostas_checklist_atual", JSON.stringify(respostas));
+    indiceMissaoAtual++;
+
+    if (indiceMissaoAtual < perguntasMissao.length) {
+        renderizarPerguntaDoChecklist();
+        return;
+    }
+
+    // FINALIZAÇÃO DE RESPOSTAS (DIAS 1 A 5)
+    let historico = JSON.parse(localStorage.getItem("gondola_historico_checklists")) || [];
+    let itensRespondidos = JSON.parse(localStorage.getItem("gondola_respostas_checklist_atual")) || [];
+    let conformes = itensRespondidos.filter(i => i.resposta === "OK").length;
+    let percentual = Math.round((conformes / itensRespondidos.length) * 100);
+
+    let diaDoCiclo = parseInt(localStorage.getItem("gondola_ciclo_checklist_dia")) || 1;
+
+    let novoChecklist = {
+        idSessao: Date.now(),
+        setor: "Checklist Operacional",
+        tipoMissao: diaDoCiclo === 5 ? "GLOBAL" : "ROTINA", // Separação para os gráficos
+        usuario: (typeof usuarioAtual !== "undefined" && usuarioAtual) ? usuarioAtual : "Administrador",
+        data: new Date().toLocaleDateString("pt-BR"),
+        hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        nota: percentual,
+        totalPerguntas: itensRespondidos.length,
+        conformes: conformes,
+        itensRespondidos: itensRespondidos
+    };
+
+    historico.push(novoChecklist);
+    localStorage.setItem("gondola_historico_checklists", JSON.stringify(historico));
+    localStorage.removeItem("gondola_respostas_checklist_atual");
+
+    // Avança para o próximo dia (no caso, vai para o Dia 6 - Dia da Gestão)
+    localStorage.setItem("gondola_ciclo_checklist_dia", diaDoCiclo + 1);
+
+    alert(`✅ Checklist gravado com sucesso!\n\nÍndice de Conformidade: ${percentual}%`);
+    abrirPainelAdmin();
+}
+
+// --- CONCLUSÃO AUTOMÁTICA DO DIA DA GESTÃO ---
+function salvarDiaDaGestaoNoHist() {
+    let historico = JSON.parse(localStorage.getItem("gondola_historico_checklists")) || [];
+
+    let analiseGestao = {
+        idSessao: Date.now(),
+        setor: "Checklist Operacional",
+        tipoMissao: "DIA_GESTAO", // Tag estratégica
+        usuario: (typeof usuarioAtual !== "undefined" && usuarioAtual) ? usuarioAtual : "Administrador",
+        data: new Date().toLocaleDateString("pt-BR"),
+        hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        nota: 100, // Pontuação fixa pela execução da análise estratégica
+        totalPerguntas: 1,
+        conformes: 1,
+        itensRespondidos: [{
+            perguntaTexto: "Hoje é o dia da gestão, analise o comportamento da loja/missões, veja quais as pendencias.",
+            setor: "Estratégico",
+            resposta: "OK",
+            observacao: "Auditoria analítica realizada pós-global"
+        }]
+    };
+
+    historico.push(analiseGestao);
+    localStorage.setItem("gondola_historico_checklists", JSON.stringify(historico));
+
+    // Finalizou o 6º dia, reseta o ciclo completo de volta para o Dia 1
+    localStorage.setItem("gondola_ciclo_checklist_dia", 1);
+
+    alert("📊 Relatório de Análise da Gestão arquivado com sucesso! Ciclo reiniciado.");
+    abrirPainelAdmin();
+}
+// ==========================================================
+// SERVIÇO: COLETOR DE ETIQUETAS AVULSO
+// CORRIGIDO - GRAVA NOME DO PRODUTO
+// ==========================================================
+
+let scannerColetorAtivo = null;
+let produtoColetorSelecionado = null;
+
+
+function abrirColetorEtiquetas() {
+
+    let container = document.querySelector(".container");
+    if (!container) return;
+
+    container.innerHTML = `
+        <div class="topo" style="background:#f0ad4e;">
+            <h1>🏷️ COLETOR DE ETIQUETAS</h1>
+            <p>Busca Direta na Base Global do Supermercado</p>
+        </div>
+
+
+        <div style="padding:20px;">
+
+            <div id="reader_coletor" style="width:100%; border-radius:8px; overflow:hidden; margin-bottom:15px;"></div>
+
+
+            <div style="display:flex; gap:8px; margin-bottom:15px;">
+
+                <button onclick="ligarCameraColetor()" 
+                style="flex:1;padding:12px;background:#007bff;color:white;border:0;border-radius:6px;font-weight:bold;">
+                📷 Abrir Câmera
+                </button>
+
+
+                <button onclick="fecharCameraColetor()" 
+                style="flex:1;padding:12px;background:#dc3545;color:white;border:0;border-radius:6px;font-weight:bold;">
+                🛑 Fechar
+                </button>
+
+            </div>
+
+
+            <label style="font-weight:bold;">
+            Código de Barras ou Nome:
+            </label>
+
+            <input id="input_coletor_etiqueta"
+            placeholder="Bipe ou digite o item..."
+            style="width:100%;padding:15px;margin:8px 0 15px;font-size:16px;box-sizing:border-box;">
+
+
+
+            <button onclick="buscarProdutoNaBaseGlobal()"
+            style="width:100%;padding:16px;background:#28a745;color:white;border:0;border-radius:6px;font-weight:bold;">
+            🔍 VERIFICAR PRODUTO
+            </button>
+
+
+            <div id="resultado_busca_coletor" style="margin-top:20px;"></div>
+
+
+
+            <button onclick="fecharCameraColetor(); voltarMenuPrincipal();"
+            style="width:100%;padding:12px;background:#6c757d;color:white;border:0;border-radius:6px;margin-top:20px;">
+            ↩ Voltar
+            </button>
+
+        </div>
+    `;
+
+
+    setTimeout(()=>{
+        document.getElementById("input_coletor_etiqueta")?.focus();
+    },100);
+}
+
+
+
+
+
+function ligarCameraColetor(){
+
+    fecharCameraColetor();
+
+    scannerColetorAtivo = new Html5QrcodeScanner(
+        "reader_coletor",
+        {
+            fps:10,
+            qrbox:{width:250,height:150}
+        }
+    );
+
+
+    scannerColetorAtivo.render((codigo)=>{
+
+        let input=document.getElementById("input_coletor_etiqueta");
+
+        if(input){
+            input.value=codigo;
+            fecharCameraColetor();
+            buscarProdutoNaBaseGlobal();
+        }
+
+    },()=>{});
+
+}
+
+
+
+
+
+function fecharCameraColetor(){
+
+    if(scannerColetorAtivo){
+
+        try{
+            scannerColetorAtivo.clear();
+        }catch(e){}
+
+        scannerColetorAtivo=null;
+    }
+
+
+    let div=document.getElementById("reader_coletor");
+
+    if(div){
+        div.innerHTML="";
+    }
+}
+
+
+
+
+
+function buscarProdutoNaBaseGlobal(){
+
+    let input=document.getElementById("input_coletor_etiqueta");
+    let resultado=document.getElementById("resultado_busca_coletor");
+
+
+    if(!input || !resultado) return;
+
+
+    let termo=input.value.trim().toUpperCase();
+
+
+    if(!termo){
+        alert("Digite ou bipe um produto!");
+        return;
+    }
+
+
+
+    let baseGlobal =
+    JSON.parse(localStorage.getItem("base_global")) ||
+    JSON.parse(localStorage.getItem("gondola_base_global")) ||
+    JSON.parse(localStorage.getItem("gondola_produtos_config")) ||
+    [];
+
+
+
+    let encontrado=null;
+
+
+
+    for(let item of baseGlobal){
+
+        if(!item) continue;
+
+
+        let codigo=
+        (item.codigo ||
+        item.cod_barra ||
+        item.barcode ||
+        item.codBarras ||
+        "")
+        .toString()
+        .trim();
+
+
+
+        let nome=
+        (item.produto ||
+        item.descricao ||
+        item.pergunta ||
+        item.nome ||
+        "")
+        .toUpperCase();
+
+
+
+        if(codigo===termo || (termo.length>3 && nome.includes(termo))){
+
+            encontrado=item;
+            break;
+        }
+
+    }
+
+
+
+
+    if(encontrado){
+
+
+        let nome =
+        encontrado.produto ||
+        encontrado.descricao ||
+        encontrado.pergunta ||
+        encontrado.nome ||
+        termo;
+
+
+
+        produtoColetorSelecionado={
+
+            codigo:
+            encontrado.codigo || termo,
+
+            nome:nome,
+
+            setor:
+            encontrado.setor || "Geral"
+        };
+
+
+
+        resultado.innerHTML=`
+
+        <div style="background:#d4edda;padding:15px;border-radius:6px;">
+        
+        <strong>✅ PRODUTO ENCONTRADO</strong>
+
+        <p style="font-weight:bold;font-size:16px;">
+        ${nome}
+        </p>
+
+        <small>
+        📍 Setor: ${produtoColetorSelecionado.setor}
+        </small>
+
+        </div>
+
+
+        <button onclick="confirmarEGravarEtiquetaPendente()"
+        style="width:100%;padding:16px;background:#28a745;color:white;border:0;border-radius:6px;margin-top:15px;font-weight:bold;">
+        💾 Confirmar e Gerar Etiqueta
+        </button>
+
+        `;
+
+
+    }else{
+
+
+        produtoColetorSelecionado={
+
+            codigo:termo,
+            nome:termo,
+            setor:"Coleta Avulsa"
+
+        };
+
+
+        resultado.innerHTML=`
+
+        <div style="background:#fff3cd;padding:15px;border-radius:6px;">
+        ⚠️ Produto não localizado.
+        <br><br>
+        Será salvo como:
+        <b>${termo}</b>
+        </div>
+
+
+        <button onclick="confirmarEGravarEtiquetaPendente()"
+        style="width:100%;padding:16px;background:#ffc107;border:0;border-radius:6px;margin-top:15px;font-weight:bold;">
+        ⚠️ Confirmar Etiqueta
+        </button>
+
+        `;
+
+    }
+
+}
+
+
+
+
+
+function confirmarEGravarEtiquetaPendente(){
+
+
+    if(!produtoColetorSelecionado){
+        alert("Nenhum produto selecionado!");
+        return;
+    }
+
+
+    let lista =
+    JSON.parse(localStorage.getItem("etiquetas_pendentes")) || [];
+
+
+    let nome =
+    produtoColetorSelecionado.nome
+    .toString()
+    .trim()
+    .toUpperCase();
+
+
+
+    let novaEtiqueta={
+
+        id:Date.now()+Math.random(),
+
+        codigo:
+        produtoColetorSelecionado.codigo,
+
+        produto:nome,
+
+        descricao:nome,
+
+        pergunta:nome,
+
+        setor:
+        produtoColetorSelecionado.setor,
+
+        data:
+        new Date().toLocaleDateString("pt-BR"),
+
+        precificado:false,
+
+        status:"PENDENTE"
+
+    };
+
+
+
+    lista.push(novaEtiqueta);
+
+
+
+    localStorage.setItem(
+        "etiquetas_pendentes",
+        JSON.stringify(lista)
+    );
+
+
+
+    alert(
+        "✅ Etiqueta salva:\n\n" + nome
+    );
+
+
+
+    // Mantém na tela do coletor
+    produtoColetorSelecionado = null;
+
+
+
+    let campo = document.getElementById("input_coletor_etiqueta");
+
+    if(campo){
+
+        campo.value = "";
+
+        campo.focus();
+
+    }
+
+
+
+    let resultado =
+    document.getElementById("resultado_busca_coletor");
+
+
+    if(resultado){
+
+        resultado.innerHTML = "";
+
+    }
+
+
+}
