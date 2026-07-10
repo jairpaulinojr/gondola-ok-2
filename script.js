@@ -235,9 +235,9 @@ function mostrarTelaLoginInicial() {
     `;
 }
 
-// ==========================================
-// 4. TELA DO ADMINISTRADOR (PAINEL DE GESTÃO)
-// ==========================================
+// ==========================================================
+// 4. TELA DO ADMINISTRADOR (PAINEL DE GESTÃO) - COM GAVETA RETRÁTIL
+// ==========================================================
 function abrirPainelAdmin() {
     let registros = JSON.parse(localStorage.getItem("registro_validades")) || [];
     let hoje = new Date();
@@ -303,6 +303,71 @@ function abrirPainelAdmin() {
         </div>
     `;
 
+    let blocoRotasEntrega = `
+        <div style="margin-top:15px; padding:10px; background:#e2f0d9; border:1px dashed #385723; border-radius:5px;">
+            <label style="font-weight:bold; color:#385723;">🚚 ATUALIZAR PLANILHA DE ROTAS (CSV)</label>
+            <input type="file" onchange="processarArquivoCSVRotas(this)" style="width:100%; font-size:11px; margin-top: 5px;">
+        </div>
+    `;
+
+    // MONTAGEM DO CORPO DO RELATÓRIO DE ENTREGAS
+    let relatorioEntregasHtml = "";
+    try {
+        let entregas = JSON.parse(localStorage.getItem("registro_entregas")) || [];
+        let total = entregas.length;
+        let pendentes = entregas.filter(e => e.status === "Pendente").length;
+        let entregues = entregas.filter(e => e.status === "Entregue").length;
+        let problemas = entregas.filter(e => e.status === "Não Recebida" || e.status === "Não Localizada").length;
+
+        relatorioEntregasHtml = `
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 10px; text-align: center; font-size:12px;">
+                <div style="background:#f8f9fa; padding:5px; border-radius:4px; border:1px solid #ddd;">Total<br><strong>${total}</strong></div>
+                <div style="background:#e6f2ff; padding:5px; border-radius:4px; border:1px solid #b6d4fe; color:#004085;">Pend.<br><strong>${pendentes}</strong></div>
+                <div style="background:#d1e7dd; padding:5px; border-radius:4px; border:1px solid #badbcc; color:#0f5132;">Ok<br><strong>${entregues}</strong></div>
+                <div style="background:#f8d7da; padding:5px; border-radius:4px; border:1px solid #f5c2c7; color:#842029;">Erro<br><strong>${problemas}</strong></div>
+            </div>
+            <div style="max-height: 200px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; background: white;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left;">
+                    <thead>
+                        <tr style="background: #efefef; color: #333; position: sticky; top: 0;">
+                            <th style="padding: 6px;">Cliente</th>
+                            <th style="padding: 6px;">Rota/Bairro</th>
+                            <th style="padding: 6px; text-align:center;">Vol.</th>
+                            <th style="padding: 6px; text-align:center;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${total === 0 ? `<tr><td colspan="4" style="padding:10px; text-align:center; color:#999;">Nenhuma entrega lançada.</td></tr>` : ""}
+                        ${entregas.map(e => {
+                            let cStatus = "#ffc107";
+                            if (e.status === "Entregue") cStatus = "#28a745";
+                            if (e.status === "Não Recebida" || e.status === "Não Localizada") cStatus = "#dc3545";
+                            
+                            // Correção para evitar exibir 'undefined' caso a propriedade varie de nome
+                            let rotaNome = e.rota || e.ROTA || "1";
+
+                            return `
+                                <tr style="border-bottom: 1px solid #f9f9f9;">
+                                    <td style="padding: 6px;"><b>${e.cliente}</b><br><span style="color:#777; font-size:10px;">${e.rua}, ${e.numero}</span></td>
+                                    <td style="padding: 6px;">R. ${rotaNome}<br><span style="color:#777; font-size:10px;">${e.bairro}</span></td>
+                                    <td style="padding: 6px; text-align:center;">${e.caixas}</td>
+                                    <td style="padding: 6px; text-align:center;"><span style="background:${cStatus}; color:white; padding:2px 4px; border-radius:3px; font-weight:bold; font-size:9px;">${e.status}</span></td>
+                                </tr>
+                            `;
+                        }).join("")}
+                    </tbody>
+                </table>
+            </div>
+            ${total > 0 ? `
+                <div style="text-align:right; margin-top:5px;">
+                    <span onclick="if(confirm('Limpar registros de hoje?')){localStorage.removeItem('registro_entregas'); abrirPainelAdmin();}" style="color:#dc3545; font-size:10px; cursor:pointer; text-decoration:underline;">🗑️ Limpar Entregas</span>
+                </div>
+            ` : ""}
+        `;
+    } catch(err) {
+        relatorioEntregasHtml = "<p style='color:red; font-size:11px;'>Erro ao carregar dados de entrega.</p>";
+    }
+
     let container = document.querySelector(".container");
     if (container) {
         container.innerHTML = `
@@ -326,23 +391,49 @@ function abrirPainelAdmin() {
                 <h3 style="margin-top:15px; border-bottom:1px solid #ccc; padding-bottom:5px;">Validades</h3>
                 <button onclick="abrirRelatorioValidadesGerente()" style="background:#20c997; color:white; width:100%; margin-bottom:15px;">📅 Controlar Vencimentos</button>
                 
+                <!-- NOVO: BOTÃO DA GAVETA DE ENTREGAS -->
+                <button onclick="alternarVisibilidadeEntregas()" id="btn-toggle-entregas" style="background:#0275d8; color:white; width:100%; margin-bottom:15px; font-weight:bold;">📊 Monitoramento de Entregas (Abrir)</button>
+                
+                <!-- GAVETA DE ENTREGAS (INICIA ESCONDIDA) -->
+                <div id="container-entregas-monitor" style="display: none; background: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; border-radius: 5px; margin-bottom:15px;">
+                    ${relatorioEntregasHtml}
+                </div>
+                
                 <button onclick="alternarVisibilidadeFicheiros()" id="btn-toggle-ficheiros" style="background:#495057; color:white; width:100%; margin: 15px 0;">📂 Importar Planilhas / Ficheiros (Abrir)</button>
                 
                 <div id="container-ficheiros-upload" style="display: none; background: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; border-radius: 5px;">
                     ${blocosInputsSetores}
                     ${blocoBaseGlobal}
                     ${blocoChecklist}
+                    ${blocoRotasEntrega}
                 </div>
 
                 <button onclick="mostrarTelaLoginInicial()" style="background:#6c757d; color:white; width: 100%; margin-top: 20px;">Voltar ao Menu Principal</button>
             </div>
         `;
 
-        // AJUSTE: Vinculação manual dos eventos após a renderização
         document.getElementById("btn-responder-checklist").addEventListener("click", abrirMenuChecklistsGerente);
         document.getElementById("btn-historico-checklist").addEventListener("click", function() {
             abrirHistoricoChecklistsGerente();
         });
+    }
+}
+
+// ==========================================================
+// FUNÇÃO PARA RECOLHER / MOSTRAR O MONITOR DE ENTREGAS
+// ==========================================================
+function alternarVisibilidadeEntregas() {
+    let painel = document.getElementById("container-entregas-monitor");
+    let botao = document.getElementById("btn-toggle-entregas");
+
+    if (!painel || !botao) return;
+
+    if (painel.style.display === "none" || painel.style.display === "") {
+        painel.style.display = "block";
+        botao.innerHTML = "📊 Monitoramento de Entregas (Fechar)";
+    } else {
+        painel.style.display = "none";
+        botao.innerHTML = "📊 Monitoramento de Entregas (Abrir)";
     }
 }
 
@@ -410,7 +501,6 @@ function voltarMenuPrincipal() {
                 📅 Verificar Validade (Base Global)
             </button>
 
-            <!-- NOVO BOTÃO: COLETOR DE ETIQUETAS AVULSO -->
             <button onclick="abrirColetorEtiquetas()" style="background:#f0ad4e; color:white; margin-top:10px;">
                 🏷️ Coletor de Etiquetas Avulso
             </button>
@@ -418,6 +508,18 @@ function voltarMenuPrincipal() {
             <button onclick="abrirAbaEtiquetas()" style="background:#ffc107; color:black; margin-top:10px;">
                 🏷️ Etiquetas Pendentes
             </button>
+
+            <hr style="margin:20px 0; border:0; border-top:1px solid #ccc;">
+
+            <h2>🚚 Sistema de Entregas</h2>
+
+            <button onclick="abrirAbaLancamentoEntrega()" style="background:#0275d8; color:white;">
+                📦 Lançar Novas Entregas (Fiscal)
+            </button>
+
+          <button onclick="abrirAbaMotoristaEntrega()" style="background:#5cb85c; color:white; margin-top:10px; width:100%;">
+    🛣️ Entregas para Fazer (Motorista)
+</button>
 
             <button onclick="mostrarTelaLoginInicial()" style="background:#6c757d; color:white; margin-top:20px;">
                 ⬅️ Sair do App
@@ -2094,4 +2196,507 @@ function confirmarEGravarEtiquetaPendente(){
     }
 
 
+}
+
+// ==========================================================
+// SUBSTITUIR APENAS ESTE BLOCO NO SEU SCRIPT
+// ==========================================================
+function processarArquivoCSVRotas(elementoInput) {
+    let arquivo = elementoInput.files[0];
+    if (!arquivo) return;
+
+    let leitor = new FileReader();
+    leitor.onload = function(e) {
+        try {
+            let texto = e.target.result;
+            // Quebra as linhas do arquivo
+            let linhas = texto.split("\n");
+            let resultado = [];
+
+            // Pula a primeira linha do cabeçalho (i = 1)
+            for (let i = 1; i < linhas.length; i++) {
+                let linhaLimpa = linhas[i].trim();
+                if (!linhaLimpa) continue;
+
+                // Corta no ponto e vírgula direto, igual nas missões
+                let colunas = linhaLimpa.split(";");
+
+                let nomeRua = colunas[2] ? colunas[2].trim().toUpperCase() : "";
+                
+                // Se a linha for fantasma ou vazia no Excel, ignora e pula
+                if (nomeRua === "" || nomeRua === "NOME") continue;
+
+                // Salva na ordem exata das colunas: A (0), B (1), C (2), D (3)
+                resultado.push({
+                    CIDADE: colunas[0] ? colunas[0].trim().toUpperCase() : "",
+                    BAIRRO: colunas[1] ? colunas[1].trim().toUpperCase() : "",
+                    NOME:   nomeRua,
+                    ROTA:   colunas[3] ? colunas[3].trim().replace("\r", "") : "1"
+                });
+            }
+
+            // Grava o banco limpo que os seus botões atuais consultam
+            localStorage.setItem("base_ruas_entrega", JSON.stringify(resultado));
+            alert("✅ Planilha base integrada! " + resultado.length + " ruas prontas.");
+            
+            if (typeof abrirPainelAdmin === "function") abrirPainelAdmin();
+
+        } catch (err) {
+            console.error(err);
+            alert("❌ Erro ao ler a planilha.");
+        }
+    };
+    leitor.readAsText(arquivo, "UTF-8");
+}
+
+// --- Variables de Controle do Fluxo em Cascata ---
+let entregaEmEdicao = {
+    cliente: "", cidade: "", bairro: "", rua: "", numero: "", apartamento: "Não", aptoDetalhe: "", caixas: 1, gelados: "Não"
+};
+
+// --- 2. TELA PRINCIPAL DO FISCAL DE CAIXA (LANÇAMENTO) ---
+function abrirAbaLancamentoEntrega() {
+    let container = document.querySelector(".container");
+    if (!container) return;
+
+    // Reset do objeto temporário
+    entregaEmEdicao = { cliente: "", cidade: "", bairro: "", rua: "", numero: "", apartamento: "Não", aptoDetalhe: "", caixas: 1, gelados: "Não" };
+
+    container.innerHTML = `
+        <div class="topo" style="background:#0275d8;">
+            <h1>📦 LANÇAMENTO DE ENTREGAS</h1>
+            <p>Fluxo Blindado contra Erros de Operação</p>
+        </div>
+
+        <div style="padding: 20px; text-align: left;">
+            <div id="bloco_passo1" style="margin-bottom: 15px;">
+                <label style="font-weight:bold; font-size:14px; color:#333;">Nome do Cliente:</label>
+                <input type="text" id="ent_nome_cliente" placeholder="Digite o nome do cliente..." oninput="buscarClienteCadastro(this.value)"
+                style="width:100%; padding:14px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box; font-size:16px; margin-top:5px; text-transform: uppercase;">
+                <div id="sugestoes_clientes" style="background:white; border-radius:0 0 6px 6px; max-height:150px; overflow-y:auto;"></div>
+            </div>
+
+            <div id="painel_cascata_botoes"></div>
+
+            <div id="formulario_final_entrega" style="display:none; background:#f8f9fa; padding:15px; border-radius:8px; border:1px solid #ddd; margin-top:15px;">
+                
+                <div style="margin-bottom: 12px;">
+                    <label style="font-weight:bold; font-size:13px;">Número da Residência:</label>
+                    <input type="text" id="ent_numero" placeholder="Ex: 150 ou S/N" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px; font-size:15px; margin-top:5px;">
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <label style="font-weight:bold; font-size:13px;">É Apartamento / Bloco?</label>
+                    <select id="ent_apto" onchange="toggleCampoApartamento(this.value)" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px; font-size:15px; margin-top:5px;">
+                        <option value="Não">Não</option>
+                        <option value="Sim">Sim</option>
+                    </select>
+                </div>
+
+                <div id="bloco_detalhe_apto" style="display:none; margin-bottom: 12px;">
+                    <label style="font-weight:bold; font-size:13px; color:#d9534f;">Detalhes do Apartamento:</label>
+                    <input type="text" id="ent_apto_detalhe" placeholder="Ex: Apto 302, Bloco B" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px; font-size:15px; margin-top:5px;">
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <label style="font-weight:bold; font-size:13px;">Quantidade de Caixas / Volumes:</label>
+                    <input type="number" id="ent_caixas" value="1" min="1" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px; font-size:15px; margin-top:5px;">
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="font-weight:bold; font-size:13px; color:#0275d8;">❄️ Contém Itens Gelados / Congelados?</label>
+                    <select id="ent_gelados" style="width:100%; padding:10px; border:1px solid #0275d8; border-radius:4px; font-size:15px; margin-top:5px; font-weight:bold; color:#0275d8;">
+                        <option value="Não">Não</option>
+                        <option value="Sim">❄️ SIM (Prioridade Máxima)</option>
+                    </select>
+                </div>
+
+                <button onclick="salvarNovaEntrega()" style="width:100%; padding:16px; background:#28a745; color:white; border:none; border-radius:6px; font-weight:bold; font-size:16px; cursor:pointer;">
+                    💾 SALVAR E GERAR TICKET
+                </button>
+            </div>
+
+            <button onclick="voltarMenuPrincipal()" style="width:100%; padding:12px; background:#6c757d; color:white; border:none; border-radius:6px; margin-top:20px; cursor:pointer; font-weight:bold;">
+                ↩ Voltar ao Menu
+            </button>
+        </div>
+    `;
+}
+
+// --- 3. INTELIGÊNCIA DO CADASTRO AUTOMÁTICO (BUM!) ---
+function buscarClienteCadastro(nomeDigitado) {
+    let termo = nomeDigitado.trim().toUpperCase();
+    let divSugestoes = document.getElementById("sugestoes_clientes");
+    if (!divSugestoes) return;
+
+    if (termo.length < 2) {
+        divSugestoes.innerHTML = "";
+        return;
+    }
+
+    let cadastros = JSON.parse(localStorage.getItem("cadastro_clientes_entrega")) || [];
+    let filtrados = cadastros.filter(c => c.nome.includes(termo));
+
+    if (filtrados.length === 0) {
+        divSugestoes.innerHTML = `<div style="padding:10px; color:#888; font-size:13px;">🆕 Cliente novo. Prossiga com os botões abaixo.</div>`;
+        // Se é novo e o fiscal continuou, libera a escolha da Cidade
+        entregaEmEdicao.cliente = termo;
+        if(document.getElementById("painel_cascata_botoes").innerHTML === "") {
+            renderizarBotoesCidade();
+        }
+        return;
+    }
+
+    divSugestoes.innerHTML = filtrados.map(c => `
+        <div onclick="aplicarClienteCadastrado('${c.nome}')" 
+             style="padding:12px; border-bottom:1px solid #eee; cursor:pointer; background:#fffbf0; font-weight:bold; color:#333;">
+             👤 ${c.nome} <br><span style="font-size:11px; color:#777;">📍 ${c.rua}, Nº ${c.numero} - ${c.bairro}</span>
+        </div>
+    `).join("");
+}
+
+function aplicarClienteCadastrado(nomeCliente) {
+    let cadastros = JSON.parse(localStorage.getItem("cadastro_clientes_entrega")) || [];
+    let c = cadastros.find(item => item.nome === nomeCliente);
+
+    if (c) {
+        // BUM! Preenche o endereço completo direto do histórico
+        document.getElementById("ent_nome_cliente").value = c.nome;
+        document.getElementById("sugestoes_clientes").innerHTML = "";
+
+        entregaEmEdicao = {
+            cliente: c.nome, cidade: c.cidade, bairro: c.bairro, rua: c.rua,
+            numero: c.numero, apartamento: c.apartamento, aptoDetalhe: c.apartamentoDetalhe,
+            caixas: 1, gelados: "Não"
+        };
+
+        // Mostra o resumo visual do endereço recuperado
+        let painel = document.getElementById("painel_cascata_botoes");
+        painel.innerHTML = `
+            <div style="background:#d1ecf1; color:#0c5460; padding:12px; border-radius:6px; margin-bottom:10px; border-left:5px solid #17a2b8;">
+                <strong>📍 Endereço Recorrente Carregado:</strong><br>
+                ${c.rua}, ${c.numero} ${c.apartamento === 'Sim' ? '- ' + c.apartamentoDetalhe : ''}<br>
+                ${c.bairro} (${c.cidade})
+                <button onclick="renderizarBotoesCidade()" style="margin-top:8px; display:block; padding:4px 8px; background:#17a2b8; color:white; border:none; border-radius:4px; font-size:11px; cursor:pointer;">🔄 Alterar Endereço</button>
+            </div>
+        `;
+
+        // Pula as etapas e abre direto os inputs de caixas e gelados
+        document.getElementById("formulario_final_entrega").style.display = "block";
+        document.getElementById("ent_numero").value = c.numero;
+        document.getElementById("ent_apto").value = c.apartamento;
+        toggleCampoApartamento(c.apartamento);
+        document.getElementById("ent_apto_detalhe").value = c.apartamentoDetalhe;
+    }
+}
+
+// --- 4. RENDERIZADORES DA CASCATA DE BOTÕES (DO EXCEL) ---
+function renderizarBotoesCidade() {
+    let baseRuas = JSON.parse(localStorage.getItem("base_ruas_entrega")) || [];
+    let cidades = [...new Set(baseRuas.map(r => r.CIDADE))].sort();
+
+    let painel = document.getElementById("painel_cascata_botoes");
+    document.getElementById("formulario_final_entrega").style.display = "none";
+
+    painel.innerHTML = `
+        <label style="font-weight:bold; font-size:13px; color:#555; display:block; margin-bottom:5px;">1. Selecione a Cidade:</label>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            ${cidades.map(cid => `<button onclick="selecionarCidade('${cid}')" style="padding:12px; background:#fff; border:2px solid #0275d8; color:#0275d8; border-radius:6px; font-weight:bold; cursor:pointer;">🏙️ ${cid}</button>`).join("")}
+        </div>
+    `;
+}
+
+function selecionarCidade(nomeCidade) {
+    entregaEmEdicao.cidade = nomeCidade;
+    
+    let baseRuas = JSON.parse(localStorage.getItem("base_ruas_entrega")) || [];
+    // Filtra bairros estritamente da cidade escolhida
+    let bairros = [...new Set(baseRuas.filter(r => r.CIDADE === nomeCidade).map(r => r.BAIRRO))].sort();
+
+    let painel = document.getElementById("painel_cascata_botoes");
+    painel.innerHTML = `
+        <div style="color:#28a745; font-size:13px; margin-bottom:8px;">✅ Cidade: <b>${nomeCidade}</b></div>
+        <label style="font-weight:bold; font-size:13px; color:#555; display:block; margin-bottom:5px;">2. Selecione o Bairro:</label>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            ${bairros.map(bai => `<button onclick="selecionarBairro('${bai}')" style="padding:10px 14px; background:#fff; border:2px solid #f0ad4e; color:#f0ad4e; border-radius:6px; font-weight:bold; cursor:pointer;">🏡 ${bai}</button>`).join("")}
+        </div>
+    `;
+}
+
+function selecionarBairro(nomeBairro) {
+    entregaEmEdicao.bairro = nomeBairro;
+
+    let baseRuas = JSON.parse(localStorage.getItem("base_ruas_entrega")) || [];
+    // Filtra as ruas estritamente pertencentes àquela Cidade e àquele Bairro
+    let ruas = baseRuas.filter(r => r.CIDADE === entregaEmEdicao.cidade && r.BAIRRO === nomeBairro).map(r => r.NOME).sort();
+
+    let painel = document.getElementById("painel_cascata_botoes");
+    painel.innerHTML = `
+        <div style="color:#28a745; font-size:13px; margin-bottom:4px;">✅ Cidade: <b>${entregaEmEdicao.cidade}</b></div>
+        <div style="color:#28a745; font-size:13px; margin-bottom:8px;">✅ Bairro: <b>${nomeBairro}</b></div>
+        <label style="font-weight:bold; font-size:13px; color:#555; display:block; margin-bottom:5px;">3. Selecione a Rua / Avenida:</label>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+            ${ruas.map(rua => `<button onclick="selecionarRua('${rua.replace(/'/g, "\\'")}')" style="padding:12px; background:#fff; border:1px solid #ddd; text-align:left; border-radius:6px; font-weight:bold; color:#333; cursor:pointer; border-left:4px solid #6c757d;">🛣️ ${rua}</button>`).join("")}
+        </div>
+    `;
+}
+
+function selecionarRua(nomeRua) {
+    entregaEmEdicao.rua = nomeRua;
+
+    // 1. Busca a rota correspondente a essa rua específica na planilha
+    let baseRuas = JSON.parse(localStorage.getItem("base_ruas_entrega")) || [];
+    let ruaEncontrada = baseRuas.find(r => 
+        r.CIDADE === entregaEmEdicao.cidade && 
+        r.BAIRRO === entregaEmEdicao.bairro && 
+        r.NOME === nomeRua
+    );
+    
+    // Define a rota com base na planilha (ou joga 1 se não achar)
+    entregaEmEdicao.rota = ruaEncontrada ? ruaEncontrada.ROTA : "1";
+
+    // 2. Limpa o painel de botões em cascata com o resumo
+    let painel = document.getElementById("painel_cascata_botoes");
+    if (painel) {
+        painel.innerHTML = `
+            <div style="color:#28a745; font-size:13px; margin-bottom:2px;">✅ Cidade: <b>${entregaEmEdicao.cidade}</b></div>
+            <div style="color:#28a745; font-size:13px; margin-bottom:2px;">✅ Bairro: <b>${entregaEmEdicao.bairro}</b></div>
+            <div style="color:#28a745; font-size:13px; margin-bottom:8px;">✅ Rua: <b>${nomeRua}</b> (Rota: ${entregaEmEdicao.rota})</div>
+        `;
+    }
+
+    // 3. SEGREDO: Força o texto verde original da sua tela a aparecer!
+    let elCidade = document.getElementById("lbl_cidade") || document.querySelector("[id*='cidade']") || document.querySelector("[id*='Cidade']");
+    let elBairro = document.getElementById("lbl_bairro") || document.querySelector("[id*='bairro']") || document.querySelector("[id*='Bairro']");
+    let elRua    = document.getElementById("lbl_rua")    || document.querySelector("[id*='rua']")    || document.querySelector("[id*='Rua']");
+
+    if (elCidade) elCidade.innerText = "Cidade: " + entregaEmEdicao.cidade;
+    if (elBairro) elBairro.innerText = "Bairro: " + entregaEmEdicao.bairro;
+    if (elRua)    elRua.innerText    = "Rua: " + nomeRua + " (Rota: " + entregaEmEdicao.rota + ")";
+
+    // 4. Mostra o formulário final para digitação do número e caixas
+    document.getElementById("formulario_final_entrega").style.display = "block";
+    
+    // Coloca o cursor direto no campo número
+    let campoNumero = document.getElementById("ent_numero") || document.getElementById("numero_residencia") || document.querySelector("input[placeholder*='Número']");
+    if (campoNumero) campoNumero.focus();
+}
+function toggleCampoApartamento(valor) {
+    document.getElementById("bloco_detalhe_apto").style.display = (valor === "Sim") ? "block" : "none";
+}
+
+// --- 5. GRAVAÇÃO REAL E CRONOMETRAGEM ---
+function salvarNovaEntrega() {
+    let nomeCliente = document.getElementById("ent_nome_cliente").value.trim().toUpperCase();
+    let num = document.getElementById("ent_numero").value.trim().toUpperCase();
+    let apto = document.getElementById("ent_apto").value;
+    let aptoDet = document.getElementById("ent_apto_detalhe").value.trim().toUpperCase();
+    let cx = parseInt(document.getElementById("ent_caixas").value) || 1;
+    let gel = document.getElementById("ent_gelados").value;
+
+    if (!nomeCliente) { alert("⚠️ Digite o nome do cliente!"); return; }
+    if (!num) { alert("⚠️ Informe o número ou digite S/N!"); return; }
+    if (apto === "Sim" && !aptoDet) { alert("⚠️ Digite os dados do apartamento!"); return; }
+
+    let entregasAtuais = JSON.parse(localStorage.getItem("registro_entregas")) || [];
+    
+    // Objeto definitivo com carimbo de data e hora para a meta das 4 horas
+    let novaEntrega = {
+        idEntrega: Date.now(),
+        cliente: nomeCliente,
+        cidade: entregaEmEdicao.cidade || "MANHUMIRIM",
+        bairro: entregaEmEdicao.bairro,
+        rua: entregaEmEdicao.rua,
+        numero: num,
+        apartamento: apto,
+        apartamentoDetalhe: aptoDet,
+        caixas: cx,
+        gelados: gel,
+        status: "Pendente",
+        dataLancamento: new Date().toLocaleDateString("pt-BR"),
+        horaLancamento: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        horaFinalizacao: null,
+        tempoDecorridoMinutos: null,
+        dentroDoPrazo: true
+    };
+
+    entregasAtuais.push(novaEntrega);
+    localStorage.setItem("registro_entregas", JSON.stringify(entregasAtuais));
+
+    // --- SALVAMENTO AUTOMÁTICO NO CADASTRO DE CLIENTES (A MÁGICA) ---
+    let cadastros = JSON.parse(localStorage.getItem("cadastro_clientes_entrega")) || [];
+    if (!cadastros.some(item => item.nome === nomeCliente)) {
+        cadastros.push({
+            nome: nomeCliente, cidade: novaEntrega.cidade, bairro: novaEntrega.bairro,
+            rua: novaEntrega.rua, numero: num, apartamento: apto, apartamentoDetalhe: aptoDet
+        });
+        localStorage.setItem("cadastro_clientes_entrega", JSON.stringify(cadastros));
+    }
+
+    alert(`✅ Sucesso!\nTicket Gerado para ${nomeCliente}.\nMeta de Entrega: até às ${calcularHoraLimite(novaEntrega.horaLancamento)}`);
+    abrirAbaLancamentoEntrega(); // Limpa e reinicia para a próxima venda
+}
+
+function calcularHoraLimite(horaString) {
+    let partes = horaString.split(":");
+    let h = (parseInt(partes[0]) + 4) % 24; // Soma as 4 horas da meta
+    return `${h.toString().padStart(2, '0')}:${partes[1]}`;
+}
+
+// --- ABA DO MOTORISTA: ROTEIRO POR COLUNA ROTA (COM CONTADORES E MEMÓRIA DE GAVETA ABERTA) ---
+function abrirAbaMotoristaEntrega(rotaParaManterAberta = null) {
+    let container = document.querySelector(".container");
+    if (!container) return;
+
+    let entregas = JSON.parse(localStorage.getItem("registro_entregas")) || [];
+    
+    // Filtra tudo o que ainda não foi finalizado (Pendente + Em Trânsito)
+    let ativas = entregas.filter(e => e.status === "Pendente" || e.status === "Em Trânsito");
+
+    // Contadores gerenciais do topo
+    let totalNaLoja = entregas.filter(e => e.status === "Pendente").length;
+    let totalNoCarro = entregas.filter(e => e.status === "Em Trânsito").length;
+
+    // Agrupa as entregas por Rota
+    let rotasAgrupadas = {};
+    ativas.forEach(e => {
+        let numRota = e.rota || e.ROTA || "GERAL";
+        let identificadorRota = "ROTA " + numRota;
+        
+        if (!rotasAgrupadas[identificadorRota]) {
+            rotasAgrupadas[identificadorRota] = {
+                entregas: [],
+                totalCaixas: 0,
+                totalGelados: 0
+            };
+        }
+        
+        rotasAgrupadas[identificadorRota].entregas.push(e);
+        rotasAgrupadas[identificadorRota].totalCaixas += parseInt(e.caixas || e.volumes || 0, 10);
+        
+        if (e.gelados === "Sim" || e.GELADOS === "Sim") {
+            rotasAgrupadas[identificadorRota].totalGelados += 1;
+        }
+    });
+
+    container.innerHTML = `
+        <div class="topo" style="background:#5cb85c;">
+            <h1>🚚 ROTEIRO DO MOTORISTA</h1>
+            <div style="display:flex; justify-content:space-around; margin-top:10px; font-size:13px; background:rgba(0,0,0,0.1); padding:8px; border-radius:6px;">
+                <span>🏪 Na Loja: <strong>${totalNaLoja} compras</strong></span>
+                <span>🛣️ No Carro: <strong>${totalNoCarro} compras</strong></span>
+            </div>
+        </div>
+
+        <div style="padding: 15px; text-align: left;">
+            
+            ${ativas.length === 0 ? `
+                <div style="text-align:center; padding:30px; color:#666;">
+                    🎉 <b>Excelente!</b> Nenhuma entrega pendente na loja ou no carro.
+                </div>
+            ` : `
+                ${Object.keys(rotasAgrupadas).sort((a, b) => {
+                    let numA = parseInt(a.replace(/\D/g, ''), 10) || 0;
+                    let numB = parseInt(b.replace(/\D/g, ''), 10) || 0;
+                    return numA - numB;
+                }).map(nomeRota => {
+                    let dadosRota = rotasAgrupadas[nomeRota];
+                    
+                    // Verifica se esta gaveta deve iniciar aberta (via clique anterior)
+                    let deveAbrir = (nomeRota === rotaParaManterAberta) ? "open" : "";
+                    
+                    return `
+                    <details ${deveAbrir} id="det-${nomeRota.replace(/\s+/g, '')}" ontoggle="if(this.open) { window.lastOpenedRoute = '${nomeRota}'; }" style="background:#fff; border:1px solid #ddd; border-radius:8px; margin-bottom:15px; box-shadow:0 2px 4px rgba(0,0,0,0.05); overflow:hidden;">
+                        
+                        <summary style="background:#e2f0d9; color:#385723; padding:12px; font-weight:bold; font-size:14px; border-bottom:1px solid #bcd; line-height:1.5; cursor:pointer; outline:none;">
+                            <span style="font-size:15px; display:block; margin-bottom:4px;">📍 ${nomeRota.toUpperCase()}</span>
+                            📋 Entregas ${dadosRota.entregas.length}<br>
+                            📦 Caixas ${dadosRota.totalCaixas}
+                            ${dadosRota.totalGelados > 0 ? `<br>❄️ Gelado ${dadosRota.totalGelados}` : ''}
+                        </summary>
+                        
+                        <div style="padding:10px; background:#fdfdfd;">
+                            ${dadosRota.entregas.map(item => {
+                                let noCarro = item.status === "Em Trânsito";
+                                return `
+                                <div style="padding:12px 0; border-bottom:1px solid #eee; background:${noCarro ? '#f7faff' : 'transparent'}; border-left: ${noCarro ? '4px solid #0275d8' : 'none'}; padding-left: ${noCarro ? '8px' : '0px'};">
+                                    <span style="font-size:11px; color:#777; float:right;">⏱️ ${item.horaLancamento || ''}</span>
+                                    
+                                    <span style="font-size:11px; float:right; margin-right:10px; background:${noCarro ? '#0275d8' : '#e67e22'}; color:white; padding:1px 5px; border-radius:4px; font-weight:bold;">
+                                        ${noCarro ? '🛣️ NO CARRO' : '🏪 NA LOJA'}
+                                    </span>
+
+                                    <strong style="font-size:15px; color:#333;">👤 ${item.cliente}</strong>
+                                    <p style="margin:4px 0; font-size:13px; color:#555;">
+                                        🏠 ${item.rua}, Nº ${item.numero} ${item.apartamento === 'Sim' ? '<b>(' + (item.apartamentoDetalhe || item.detalheApto || '') + ')</b>' : ''}
+                                    </p>
+                                    <p style="margin:2px 0; font-size:12px; color:#888;">🏡 Bairro: ${item.bairro} | 🏙️ ${item.cidade || ''}</p>
+                                    
+                                    <div style="margin:5px 0; font-size:13px;">
+                                        📦 <b>Volumes:</b> <span style="background:#ddd; padding:2px 6px; border-radius:4px; font-weight:bold;">${item.caixas || item.volumes || 0}</span>
+                                        ${item.gelados === 'Sim' ? `<span style="background:#b0cedb; color:#0c5460; padding:2px 6px; border-radius:4px; font-weight:bold; margin-left:5px; font-size:11px;">❄️ Contém Gelados</span>` : ''}
+                                    </div>
+
+                                    <div style="margin-top:10px;">
+                                        ${!noCarro ? `
+                                            <button onclick="inserirCompraNaRota(${item.idEntrega || item.id}, '${nomeRota}')" style="width:100%; padding:8px; background:#0275d8; color:white; border:none; border-radius:4px; font-weight:bold; font-size:12px; cursor:pointer;">
+                                                🚚 Inserir esta compra no Carro
+                                            </button>
+                                        ` : `
+                                            <div style="display:flex; gap:5px;">
+                                                <button onclick="mudarStatusEntrega(${item.idEntrega || item.id}, 'Entregue', '${nomeRota}')" style="flex:1; padding:8px; background:#28a745; color:white; border:none; border-radius:4px; font-weight:bold; font-size:12px; cursor:pointer;">✅ Entregue</button>
+                                                <button onclick="mudarStatusEntrega(${item.idEntrega || item.id}, 'Não Recebida', '${nomeRota}')" style="flex:1; padding:8px; background:#f0ad4e; color:white; border:none; border-radius:4px; font-weight:bold; font-size:12px; cursor:pointer;">❌ Não Rec.</button>
+                                                <button onclick="mudarStatusEntrega(${item.idEntrega || item.id}, 'Não Localizada', '${nomeRota}')" style="flex:1; padding:8px; background:#d9534f; color:white; border:none; border-radius:4px; font-weight:bold; font-size:12px; cursor:pointer;">📍 Não Loc.</button>
+                                            </div>
+                                        `}
+                                    </div>
+                                </div>
+                                `;
+                            }).join("")}
+                        </div>
+                    </details>
+                    `;
+                }).join("")}
+            `}
+
+            <button onclick="voltarMenuPrincipal()" style="width:100%; padding:12px; background:#6c757d; color:white; border:none; border-radius:6px; margin-top:15px; cursor:pointer; font-weight:bold; font-size:14px;">
+                ↩ Voltar ao Menu
+            </button>
+        </div>
+    `;
+}
+
+// --- FUNÇÃO PARA INSERIR UMA COMPRA INDIVIDUAL NO CARRO ---
+function inserirCompraNaRota(idEntrega, nomeRota) {
+    let entregas = JSON.parse(localStorage.getItem("registro_entregas")) || [];
+    let item = entregas.find(e => (e.idEntrega || e.id) == idEntrega);
+
+    if (item) {
+        item.status = "Em Trânsito";
+        localStorage.setItem("registro_entregas", JSON.stringify(entregas));
+        // Recarrega mantendo a mesma gaveta de rota aberta
+        abrirAbaMotoristaEntrega(nomeRota || window.lastOpenedRoute); 
+    }
+}
+
+// --- MUDANÇA DE STATUS DA ENTREGA (MOTORISTA) ---
+function mudarStatusEntrega(idEntrega, novoStatus, nomeRota) {
+    let entregas = JSON.parse(localStorage.getItem("registro_entregas")) || [];
+    let entregaEncontrada = entregas.find(e => (e.idEntrega || e.id) == idEntrega);
+    
+    if (entregaEncontrada) {
+        entregaEncontrada.status = novoStatus;
+        
+        if (novoStatus === 'Entregue') {
+            entregaEncontrada.horaFinalizacao = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+        
+        localStorage.setItem("registro_entregas", JSON.stringify(entregas));
+        
+        alert(`📦 Entrega de ${entregaEncontrada.cliente} marcada como: ${novoStatus}!`);
+        // Recarrega mantendo a mesma gaveta de rota aberta para finalizar as próximas se houver
+        abrirAbaMotoristaEntrega(nomeRota || window.lastOpenedRoute);
+    } else {
+        alert("⚠️ Erro: Entrega não encontrada na base de dados.");
+    }
 }
