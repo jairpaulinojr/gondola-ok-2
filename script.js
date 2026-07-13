@@ -2228,9 +2228,6 @@ function confirmarEGravarEtiquetaPendente(){
 
 }
 
-// ==========================================================
-// SUBSTITUIR APENAS ESTE BLOCO NO SEU SCRIPT
-// ==========================================================
 function processarArquivoCSVRotas(elementoInput) {
     let arquivo = elementoInput.files[0];
     if (!arquivo) return;
@@ -2239,41 +2236,36 @@ function processarArquivoCSVRotas(elementoInput) {
     leitor.onload = function(e) {
         try {
             let texto = e.target.result;
-            // Quebra as linhas do arquivo
             let linhas = texto.split("\n");
             let resultado = [];
 
-            // Pula a primeira linha do cabeçalho (i = 1)
             for (let i = 1; i < linhas.length; i++) {
                 let linhaLimpa = linhas[i].trim();
                 if (!linhaLimpa) continue;
 
-                // Corta no ponto e vírgula direto, igual nas missões
                 let colunas = linhaLimpa.split(";");
-
                 let nomeRua = colunas[2] ? colunas[2].trim().toUpperCase() : "";
-                
-                // Se a linha for fantasma ou vazia no Excel, ignora e pula
+
                 if (nomeRua === "" || nomeRua === "NOME") continue;
 
-                // Salva na ordem exata das colunas: A (0), B (1), C (2), D (3)
                 resultado.push({
-                    CIDADE: colunas[0] ? colunas[0].trim().toUpperCase() : "",
-                    BAIRRO: colunas[1] ? colunas[1].trim().toUpperCase() : "",
-                    NOME:   nomeRua,
-                    ROTA:   colunas[3] ? colunas[3].trim().replace("\r", "") : "1"
+                    CIDADE: colunas[0] ? colunas[0].trim().toUpperCase() : "MANHUMIRIM",
+                    BAIRRO: colunas[1] ? colunas[1].trim().toUpperCase() : "CENTRO",
+                    NOME: nomeRua,
+                    ROTA: colunas[3] ? colunas[3].trim().toUpperCase() : "1"
                 });
             }
 
-            // Grava o banco limpo que os seus botões atuais consultam
+            // Salva na nossa nova variável do Google Sheets e no backup local
+            baseRuasGlobal = resultado;
             localStorage.setItem("base_ruas_entrega", JSON.stringify(resultado));
-            alert("✅ Planilha base integrada! " + resultado.length + " ruas prontas.");
             
-            if (typeof abrirPainelAdmin === "function") abrirPainelAdmin();
+            alert("✅ Banco de ruas importado localmente com sucesso via CSV!");
+            renderizarBotoesCidade(); // Atualiza a tela de botões na hora
 
-        } catch (err) {
-            console.error(err);
-            alert("❌ Erro ao ler a planilha.");
+        } catch (erro) {
+            console.error("Erro ao processar CSV:", erro);
+            alert("⚠️ Erro ao ler o arquivo CSV. Verifique o formato.");
         }
     };
     leitor.readAsText(arquivo, "UTF-8");
