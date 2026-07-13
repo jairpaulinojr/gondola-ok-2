@@ -1,3 +1,33 @@
+// --- CONEXÃO COM O BANCO DE DADOS DO GOOGLE SHEETS ---
+let baseRuasGlobal = []; // Substituirá a base_ruas_entrega do localStorage antigo
+const URL_GOOGLE_SHEETS = "https://script.google.com/macros/s/AKfycbwqsis8lmfOe95to0IL2h7gDo4EVNYa9_Ey5P3cL7l0_o-YZHoNsTHQ8gfz6phM2J53/exec";
+
+// Função para buscar as ruas na nuvem automaticamente ao iniciar o App
+function inicializarBancoDeRuas() {
+    fetch(URL_GOOGLE_SHEETS)
+        .then(response => response.json())
+        .then(dados => {
+            // Seus dados chegam formatados: { cidade: "...", bairro: "...", rua: "...", rota: "..." }
+            // Mapeamos para o formato em CAIXA ALTA esperado pelo restante do seu código
+            baseRuasGlobal = dados.map(item => ({
+                CIDADE: item.cidade.toUpperCase(),
+                BAIRRO: item.bairro.toUpperCase(),
+                NOME: item.rua.toUpperCase(),
+                ROTA: item.rota
+            }));
+            console.log("🚀 Banco de Dados unificado carregado com sucesso! Ruas:", baseRuasGlobal.length);
+        })
+        .catch(erro => {
+            console.error("⚠️ Falha ao buscar ruas do Google Sheets, usando backup local:", erro);
+            // Backup de segurança: se a internet falhar, busca o que tiver no localStorage
+            let backupLocal = JSON.parse(localStorage.getItem("base_ruas_entrega")) || [];
+            baseRuasGlobal = backupLocal;
+        });
+}
+
+// Executa a carga assim que o script for lido pelo navegador
+inicializarBancoDeRuas();
+
 // ==========================================
 // 1. BANCOS DE DADOS SEPARADOS (Memória Local)
 // ==========================================
@@ -2390,13 +2420,25 @@ function aplicarClienteCadastrado(nomeCliente) {
     }
 }
 
-// --- 4. RENDERIZADORES DA CASCATA DE BOTÕES (DO EXCEL) ---
+// =========================================================================
+// --- 4. RENDERIZADORES DA CASCATA DE BOTÕES (INTEGRADO GOOGLE SHEETS) ---
+// =========================================================================
+
 function renderizarBotoesCidade() {
-    let baseRuas = JSON.parse(localStorage.getItem("base_ruas_entrega")) || [];
-    let cidades = [...new Set(baseRuas.map(r => r.CIDADE))].sort();
+    // Busca as cidades exclusivas diretamente da lista global vinda do Google Sheets
+    let cidades = [...new Set(baseRuasGlobal.map(r => r.CIDADE))].sort();
 
     let painel = document.getElementById("painel_cascata_botoes");
     document.getElementById("formulario_final_entrega").style.display = "none";
+
+    // Se a internet estiver lenta e o Sheets ainda não tiver respondido
+    if (baseRuasGlobal.length === 0) {
+        painel.innerHTML = `
+            <div style="padding:15px; color:#0275d8; font-weight:bold; text-align:center;">
+                ⏳ Carregando rotas e ruas do servidor do Google... Aguarde um instante.
+            </div>`;
+        return;
+    }
 
     painel.innerHTML = `
         <label style="font-weight:bold; font-size:13px; color:#555; display:block; margin-bottom:5px;">1. Selecione a Cidade:</label>
@@ -2409,9 +2451,8 @@ function renderizarBotoesCidade() {
 function selecionarCidade(nomeCidade) {
     entregaEmEdicao.cidade = nomeCidade;
     
-    let baseRuas = JSON.parse(localStorage.getItem("base_ruas_entrega")) || [];
-    // Filtra bairros estritamente da cidade escolhida
-    let bairros = [...new Set(baseRuas.filter(r => r.CIDADE === nomeCidade).map(r => r.BAIRRO))].sort();
+    // Filtra bairros da cidade selecionada na lista vinda da nuvem
+    let bairros = [...new Set(baseRuasGlobal.filter(r => r.CIDADE === nomeCidade).map(r => r.BAIRRO))].sort();
 
     let painel = document.getElementById("painel_cascata_botoes");
     painel.innerHTML = `
@@ -2426,9 +2467,8 @@ function selecionarCidade(nomeCidade) {
 function selecionarBairro(nomeBairro) {
     entregaEmEdicao.bairro = nomeBairro;
 
-    let baseRuas = JSON.parse(localStorage.getItem("base_ruas_entrega")) || [];
-    // Filtra as ruas estritamente pertencentes àquela Cidade e àquele Bairro
-    let ruas = baseRuas.filter(r => r.CIDADE === entregaEmEdicao.cidade && r.BAIRRO === nomeBairro).map(r => r.NOME).sort();
+    // Filtra as ruas da cidade e do bairro selecionados na nuvem
+    let ruas = baseRuasGlobal.filter(r => r.CIDADE === entregaEmEdicao.cidade && r.BAIRRO === nomeBairro).map(r => r.NOME).sort();
 
     let painel = document.getElementById("painel_cascata_botoes");
     painel.innerHTML = `
@@ -2436,7 +2476,11 @@ function selecionarBairro(nomeBairro) {
         <div style="color:#28a745; font-size:13px; margin-bottom:8px;">✅ Bairro: <b>${nomeBairro}</b></div>
         <label style="font-weight:bold; font-size:13px; color:#555; display:block; margin-bottom:5px;">3. Selecione a Rua / Avenida:</label>
         <div style="display:flex; flex-direction:column; gap:6px;">
-            ${ruas.map(rua => `<button onclick="selecionarRua('${rua.replace(/'/g, "\\'")}')" style="padding:12px; background:#fff; border:1px solid #ddd; text-align:left; border-radius:6px; font-weight:bold; color:#333; cursor:pointer; border-left:4px solid #6c757d;">🛣️ ${rua}</button>`).join("")}
+            ${ruas.map(rua => {
+                // Escapa caracteres para não quebrar a chamada do clique do botão no HTML
+                let ruaEscapada = rua.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                return `<button onclick="selecionarRua('${ruaEscapada}')" style="padding:12px; background:#fff; border:1px solid #ddd; text-align:left; border-radius:6px; font-weight:bold; color:#333; cursor:pointer; border-left:4px solid #6c757d;">🛣️ ${rua}</button>`;
+            }).join("")}
         </div>
     `;
 }
@@ -2444,18 +2488,17 @@ function selecionarBairro(nomeBairro) {
 function selecionarRua(nomeRua) {
     entregaEmEdicao.rua = nomeRua;
 
-    // 1. Busca a rota correspondente a essa rua específica na planilha
-    let baseRuas = JSON.parse(localStorage.getItem("base_ruas_entrega")) || [];
-    let ruaEncontrada = baseRuas.find(r => 
+    // Encontra a rota correta para a rua no banco global
+    let ruaEncontrada = baseRuasGlobal.find(r => 
         r.CIDADE === entregaEmEdicao.cidade && 
         r.BAIRRO === entregaEmEdicao.bairro && 
         r.NOME === nomeRua
     );
     
-    // Define a rota com base na planilha (ou joga 1 se não achar)
+    // Define a rota encontrada (ou joga 1 se houver alguma inconsistência)
     entregaEmEdicao.rota = ruaEncontrada ? ruaEncontrada.ROTA : "1";
 
-    // 2. Limpa o painel de botões em cascata com o resumo
+    // Mostra o resumo do endereço selecionado no painel
     let painel = document.getElementById("painel_cascata_botoes");
     if (painel) {
         painel.innerHTML = `
@@ -2465,7 +2508,7 @@ function selecionarRua(nomeRua) {
         `;
     }
 
-    // 3. SEGREDO: Força o texto verde original da sua tela a aparecer!
+    // Atualiza os textos verdes originais (caso existam na sua tela)
     let elCidade = document.getElementById("lbl_cidade") || document.querySelector("[id*='cidade']") || document.querySelector("[id*='Cidade']");
     let elBairro = document.getElementById("lbl_bairro") || document.querySelector("[id*='bairro']") || document.querySelector("[id*='Bairro']");
     let elRua    = document.getElementById("lbl_rua")    || document.querySelector("[id*='rua']")    || document.querySelector("[id*='Rua']");
@@ -2474,13 +2517,15 @@ function selecionarRua(nomeRua) {
     if (elBairro) elBairro.innerText = "Bairro: " + entregaEmEdicao.bairro;
     if (elRua)    elRua.innerText    = "Rua: " + nomeRua + " (Rota: " + entregaEmEdicao.rota + ")";
 
-    // 4. Mostra o formulário final para digitação do número e caixas
+    // Mostra o formulário de finalização da entrega (Número, Apt, Volumes, Gelado)
     document.getElementById("formulario_final_entrega").style.display = "block";
     
-    // Coloca o cursor direto no campo número
+    // Move o foco para o campo do Número da residência automaticamente
     let campoNumero = document.getElementById("ent_numero") || document.getElementById("numero_residencia") || document.querySelector("input[placeholder*='Número']");
     if (campoNumero) campoNumero.focus();
 }
+
+// Controla a exibição do campo de detalhes do apartamento
 function toggleCampoApartamento(valor) {
     document.getElementById("bloco_detalhe_apto").style.display = (valor === "Sim") ? "block" : "none";
 }
