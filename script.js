@@ -2227,8 +2227,39 @@ function confirmarEGravarEtiquetaPendente(){
 }
 
 // --- CONEXÃO COM O BANCO DE DADOS DO GOOGLE SHEETS ---
-let baseRuasGlobal = []; // Substituirá a base_ruas_entrega do localStorage antigo
+let baseRuasGlobal = []; 
 const URL_API = "https://script.google.com/macros/s/AKfycbwd_Ef_qL9K7A29xdG4SDEl1_G7tOpuv4yNGMDI-tO_MQXh9bzx7CBeVv-cspZeDTv9/exec";
+
+// --- INICIALIZAÇÃO AUTOMÁTICA AO ABRIR O APP (Resolve o problema do Celular) ---
+window.onload = function() {
+    console.log("Iniciando app...");
+    
+    // 1. Carrega imediatamente o que tiver salvo no celular para não ficar em branco
+    let ruasLocais = localStorage.getItem("base_ruas_entrega");
+    if (ruasLocais) {
+        baseRuasGlobal = JSON.parse(ruasLocais);
+        console.log("Rotas locais carregadas do cache.");
+    }
+
+    // 2. Busca os dados atualizados do Google em segundo plano
+    fetch(`${URL_API}?acao=buscarRuas`)
+    .then(response => response.json())
+    .then(dadosPlanilha => {
+        if (dadosPlanilha && dadosPlanilha.length > 0) {
+            baseRuasGlobal = dadosPlanilha;
+            localStorage.setItem("base_ruas_entrega", JSON.stringify(dadosPlanilha));
+            console.log("Sincronizado com o Google Sheets!");
+            
+            // Se estiver na tela de lançamento, atualiza os botões de imediato
+            if (document.getElementById("painel_cascata_botoes")) {
+                renderizarBotoesCidade();
+            }
+        }
+    })
+    .catch(err => {
+        console.warn("Modo offline ativo. Usando dados locais.", err);
+    });
+};
 
 function processarArquivoCSVRotas(elementoInput) {
     let arquivo = elementoInput.files[0];
@@ -2258,12 +2289,11 @@ function processarArquivoCSVRotas(elementoInput) {
                 });
             }
 
-            // Salva na nossa nova variável do Google Sheets e no backup local
             baseRuasGlobal = resultado;
             localStorage.setItem("base_ruas_entrega", JSON.stringify(resultado));
             
             alert("✅ Banco de ruas importado localmente com sucesso via CSV!");
-            renderizarBotoesCidade(); // Atualiza a tela de botões na hora
+            renderizarBotoesCidade(); 
 
         } catch (erro) {
             console.error("Erro ao processar CSV:", erro);
@@ -2273,17 +2303,14 @@ function processarArquivoCSVRotas(elementoInput) {
     leitor.readAsText(arquivo, "UTF-8");
 }
 
-// --- Variables de Controle do Fluxo em Cascata ---
 let entregaEmEdicao = {
     cliente: "", cidade: "", bairro: "", rua: "", numero: "", apartamento: "Não", aptoDetalhe: "", caixas: 1, gelados: "Não"
 };
 
-// --- 2. TELA PRINCIPAL DO FISCAL DE CAIXA (LANÇAMENTO) ---
 function abrirAbaLancamentoEntrega() {
     let container = document.querySelector(".container");
     if (!container) return;
 
-    // Reset do objeto temporário
     entregaEmEdicao = { cliente: "", cidade: "", bairro: "", rua: "", numero: "", apartamento: "Não", aptoDetalhe: "", caixas: 1, gelados: "Não" };
 
     container.innerHTML = `
@@ -2347,7 +2374,6 @@ function abrirAbaLancamentoEntrega() {
     `;
 }
 
-// --- 3. INTELIGÊNCIA DO CADASTRO AUTOMÁTICO (BUM!) ---
 function buscarClienteCadastro(nomeDigitado) {
     let termo = nomeDigitado.trim().toUpperCase();
     let divSugestoes = document.getElementById("sugestoes_clientes");
@@ -2358,7 +2384,6 @@ function buscarClienteCadastro(nomeDigitado) {
         return;
     }
 
-    // Busca da lista local de históricos carregados
     let cadastros = JSON.parse(localStorage.getItem("cadastro_clientes_entrega")) || [];
     let filtrados = cadastros.filter(c => c.nome.includes(termo));
 
@@ -2411,9 +2436,6 @@ function aplicarClienteCadastrado(nomeCliente) {
     }
 }
 
-// =========================================================================
-// --- 4. RENDERIZADORES DA CASCATA DE BOTÕES (INTEGRADO GOOGLE SHEETS) ---
-// =========================================================================
 function renderizarBotoesCidade() {
     let cidades = [...new Set(baseRuasGlobal.map(r => r.CIDADE))].sort();
 
@@ -2423,7 +2445,7 @@ function renderizarBotoesCidade() {
     if (baseRuasGlobal.length === 0) {
         painel.innerHTML = `
             <div style="padding:15px; color:#0275d8; font-weight:bold; text-align:center;">
-                ⏳ Carregando rotas e ruas do servidor do Google... Aguarde um instante.
+                ⏳ Carregando rotas e ruas do servidor do Google... Aguarde um instante ou importe um CSV de rotas.
             </div>`;
         return;
     }
@@ -2506,7 +2528,6 @@ function toggleCampoApartamento(valor) {
     document.getElementById("bloco_detalhe_apto").style.display = (valor === "Sim") ? "block" : "none";
 }
 
-// --- 5. GRAVAÇÃO REAL INTEGRADA AO GOOGLE SHEETS ---
 function salvarNovaEntrega() {
     let nomeCliente = document.getElementById("ent_nome_cliente").value.trim().toUpperCase();
     let num = document.getElementById("ent_numero").value.trim().toUpperCase();
@@ -2519,7 +2540,6 @@ function salvarNovaEntrega() {
     if (!num) { alert("⚠️ Informe o número ou digite S/N!"); return; }
     if (apto === "Sim" && !aptoDet) { alert("⚠️ Digite os dados do apartamento!"); return; }
 
-    // Cria o objeto de entrega estruturado para a planilha
     let novaEntrega = {
         idEntrega: Date.now().toString(),
         cliente: nomeCliente,
@@ -2539,9 +2559,6 @@ function salvarNovaEntrega() {
         dentroDoPrazo: "Sim"
     };
 
-    console.log("Enviando entrega para a planilha do Google...");
-
-    // 1. Envia os dados para a aba "LANCAMENTOS" na planilha
     fetch(`${URL_API}?acao=salvarEntrega`, {
         method: "POST",
         body: JSON.stringify(novaEntrega)
@@ -2549,9 +2566,6 @@ function salvarNovaEntrega() {
     .then(response => response.json())
     .then(res => {
         if (res.status === "sucesso") {
-            console.log("🚀 Entrega salva com sucesso no Google Sheets!");
-            
-            // 2. Registra o cliente na aba "CADASTRO_CLIENTES" e no backup histórico local
             let novoClienteData = {
                 cliente: nomeCliente,
                 cidade: novaEntrega.cidade,
@@ -2562,7 +2576,6 @@ function salvarNovaEntrega() {
                 apto_detalhe: aptoDet
             };
 
-            // Mantém backup local do cadastro para busca instantânea rápida (autocompletar)
             let cadastrosLocais = JSON.parse(localStorage.getItem("cadastro_clientes_entrega")) || [];
             if (!cadastrosLocais.some(item => item.nome === nomeCliente)) {
                 cadastrosLocais.push({
@@ -2572,14 +2585,13 @@ function salvarNovaEntrega() {
                 localStorage.setItem("cadastro_clientes_entrega", JSON.stringify(cadastrosLocais));
             }
 
-            // Grava na aba do Google Sheets
             fetch(`${URL_API}?acao=salvarCliente`, {
                 method: "POST",
                 body: JSON.stringify(novoClienteData)
             })
             .then(() => {
                 alert(`✅ Sucesso!\nTicket Gerado na Planilha para ${nomeCliente}.\nMeta de Entrega: até às ${calcularHoraLimite(novaEntrega.horaLancamento)}`);
-                abrirAbaLancamentoEntrega(); // Limpa a tela para a próxima venda
+                abrirAbaLancamentoEntrega(); 
             })
             .catch(err => console.error("Erro ao salvar cliente na nuvem:", err));
         } else {
@@ -2595,16 +2607,14 @@ function salvarNovaEntrega() {
 function calcularHoraLimite(horaString) {
     if (!horaString) return "";
     let partes = horaString.split(":");
-    let h = (parseInt(partes[0]) + 4) % 24; // Meta padrão de 4 horas
+    let h = (parseInt(partes[0]) + 4) % 24; 
     return `${h.toString().padStart(2, '0')}:${partes[1]}`;
 }
 
-// --- ABA DO MOTORISTA (ATUALIZADA E SINCRONIZADA COM A NUVEM) ---
 function abrirAbaMotoristaEntrega(rotaParaManterAberta = null) {
     let container = document.querySelector(".container");
     if (!container) return;
 
-    // Tela temporária de carregamento
     container.innerHTML = `
         <div style="text-align:center; padding:40px; color:#333;">
             <p style="font-size:18px; font-weight:bold;">⏳ Buscando roteiro na nuvem...</p>
@@ -2612,7 +2622,6 @@ function abrirAbaMotoristaEntrega(rotaParaManterAberta = null) {
         </div>
     `;
 
-    // Sincroniza puxando os dados ativos da aba de lançamentos da planilha
     fetch(`${URL_API}?acao=buscarEntregas`)
     .then(response => response.json())
     .then(entregasGlobaisCompartilhadas => {
@@ -2623,7 +2632,6 @@ function abrirAbaMotoristaEntrega(rotaParaManterAberta = null) {
 
         let rotasAgrupadas = {};
         
-        // Agrupa as entregas em suas respectivas rotas de forma inteligente
         ativas.forEach(e => {
             let numRota = e.rota || e.ROTA || "GERAL";
             let identificadorRota = "ROTA " + numRota.toString().trim().toUpperCase();
@@ -2638,7 +2646,6 @@ function abrirAbaMotoristaEntrega(rotaParaManterAberta = null) {
             }
         });
 
-        // Monta o visual estruturado do Roteiro
         container.innerHTML = `
             <div class="topo" style="background:#5cb85c; padding: 15px; text-align: center; color: white;">
                 <h1 style="margin:0; font-size:20px;">🚚 ROTEIRO COMPARTILHADO</h1>
@@ -2736,12 +2743,10 @@ function abrirAbaMotoristaEntrega(rotaParaManterAberta = null) {
     });
 }
 
-// --- FUNÇÃO PARA INSERIR UMA COMPRA NO CARRO (NUVEM) ---
 function inserirCompraNaRota(idEntrega, nomeRota) {
     mudarStatusEntregaNaPlanilha(idEntrega, "Em Trânsito", nomeRota);
 }
 
-// --- MUDANÇA DE STATUS DA ENTREGA COM ENVIO PARA O GOOGLE SHEETS ---
 function mudarStatusEntregaNaPlanilha(idEntrega, novoStatus, nomeRota) {
     let horaFinalizacao = "";
     if (novoStatus === 'Entregue') {
@@ -2750,7 +2755,7 @@ function mudarStatusEntregaNaPlanilha(idEntrega, novoStatus, nomeRota) {
 
     let dadosAtualizacao = {
         idEntrega: idEntrega.toString(),
-        status: novoStatus,
+        status: statusMapeado(novoStatus),
         horaFinalizacao: horaFinalizacao
     };
 
@@ -2773,4 +2778,11 @@ function mudarStatusEntregaNaPlanilha(idEntrega, novoStatus, nomeRota) {
         console.error("Erro ao atualizar status na nuvem:", erro);
         alert("⚠️ Falha de rede. Não foi possível salvar o status na planilha.");
     });
+}
+
+// Pequena correção auxiliar para garantir consistência de texto
+function statusMapeado(status) {
+    if (status === "Não Recebida") return "Não Recebida";
+    if (status === "Não Localizada") return "Não Localizada";
+    return status;
 }
