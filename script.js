@@ -2226,6 +2226,10 @@ function confirmarEGravarEtiquetaPendente(){
 
 }
 
+// --- CONEXÃO COM O BANCO DE DADOS DO GOOGLE SHEETS ---
+let baseRuasGlobal = []; // Substituirá a base_ruas_entrega do localStorage antigo
+const URL_API = "https://script.google.com/macros/s/AKfycbwd_Ef_qL9K7A29xdG4SDEl1_G7tOpuv4yNGMDI-tO_MQXh9bzx7CBeVv-cspZeDTv9/exec";
+
 function processarArquivoCSVRotas(elementoInput) {
     let arquivo = elementoInput.files[0];
     if (!arquivo) return;
@@ -2354,12 +2358,12 @@ function buscarClienteCadastro(nomeDigitado) {
         return;
     }
 
+    // Busca da lista local de históricos carregados
     let cadastros = JSON.parse(localStorage.getItem("cadastro_clientes_entrega")) || [];
     let filtrados = cadastros.filter(c => c.nome.includes(termo));
 
     if (filtrados.length === 0) {
         divSugestoes.innerHTML = `<div style="padding:10px; color:#888; font-size:13px;">🆕 Cliente novo. Prossiga com os botões abaixo.</div>`;
-        // Se é novo e o fiscal continuou, libera a escolha da Cidade
         entregaEmEdicao.cliente = termo;
         if(document.getElementById("painel_cascata_botoes").innerHTML === "") {
             renderizarBotoesCidade();
@@ -2380,7 +2384,6 @@ function aplicarClienteCadastrado(nomeCliente) {
     let c = cadastros.find(item => item.nome === nomeCliente);
 
     if (c) {
-        // BUM! Preenche o endereço completo direto do histórico
         document.getElementById("ent_nome_cliente").value = c.nome;
         document.getElementById("sugestoes_clientes").innerHTML = "";
 
@@ -2390,7 +2393,6 @@ function aplicarClienteCadastrado(nomeCliente) {
             caixas: 1, gelados: "Não"
         };
 
-        // Mostra o resumo visual do endereço recuperado
         let painel = document.getElementById("painel_cascata_botoes");
         painel.innerHTML = `
             <div style="background:#d1ecf1; color:#0c5460; padding:12px; border-radius:6px; margin-bottom:10px; border-left:5px solid #17a2b8;">
@@ -2401,7 +2403,6 @@ function aplicarClienteCadastrado(nomeCliente) {
             </div>
         `;
 
-        // Pula as etapas e abre direto os inputs de caixas e gelados
         document.getElementById("formulario_final_entrega").style.display = "block";
         document.getElementById("ent_numero").value = c.numero;
         document.getElementById("ent_apto").value = c.apartamento;
@@ -2413,15 +2414,12 @@ function aplicarClienteCadastrado(nomeCliente) {
 // =========================================================================
 // --- 4. RENDERIZADORES DA CASCATA DE BOTÕES (INTEGRADO GOOGLE SHEETS) ---
 // =========================================================================
-
 function renderizarBotoesCidade() {
-    // Busca as cidades exclusivas diretamente da lista global vinda do Google Sheets
     let cidades = [...new Set(baseRuasGlobal.map(r => r.CIDADE))].sort();
 
     let painel = document.getElementById("painel_cascata_botoes");
     document.getElementById("formulario_final_entrega").style.display = "none";
 
-    // Se a internet estiver lenta e o Sheets ainda não tiver respondido
     if (baseRuasGlobal.length === 0) {
         painel.innerHTML = `
             <div style="padding:15px; color:#0275d8; font-weight:bold; text-align:center;">
@@ -2440,8 +2438,6 @@ function renderizarBotoesCidade() {
 
 function selecionarCidade(nomeCidade) {
     entregaEmEdicao.cidade = nomeCidade;
-    
-    // Filtra bairros da cidade selecionada na lista vinda da nuvem
     let bairros = [...new Set(baseRuasGlobal.filter(r => r.CIDADE === nomeCidade).map(r => r.BAIRRO))].sort();
 
     let painel = document.getElementById("painel_cascata_botoes");
@@ -2456,8 +2452,6 @@ function selecionarCidade(nomeCidade) {
 
 function selecionarBairro(nomeBairro) {
     entregaEmEdicao.bairro = nomeBairro;
-
-    // Filtra as ruas da cidade e do bairro selecionados na nuvem
     let ruas = baseRuasGlobal.filter(r => r.CIDADE === entregaEmEdicao.cidade && r.BAIRRO === nomeBairro).map(r => r.NOME).sort();
 
     let painel = document.getElementById("painel_cascata_botoes");
@@ -2467,7 +2461,6 @@ function selecionarBairro(nomeBairro) {
         <label style="font-weight:bold; font-size:13px; color:#555; display:block; margin-bottom:5px;">3. Selecione a Rua / Avenida:</label>
         <div style="display:flex; flex-direction:column; gap:6px;">
             ${ruas.map(rua => {
-                // Escapa caracteres para não quebrar a chamada do clique do botão no HTML
                 let ruaEscapada = rua.replace(/'/g, "\\'").replace(/"/g, '&quot;');
                 return `<button onclick="selecionarRua('${ruaEscapada}')" style="padding:12px; background:#fff; border:1px solid #ddd; text-align:left; border-radius:6px; font-weight:bold; color:#333; cursor:pointer; border-left:4px solid #6c757d;">🛣️ ${rua}</button>`;
             }).join("")}
@@ -2478,17 +2471,14 @@ function selecionarBairro(nomeBairro) {
 function selecionarRua(nomeRua) {
     entregaEmEdicao.rua = nomeRua;
 
-    // Encontra a rota correta para a rua no banco global
     let ruaEncontrada = baseRuasGlobal.find(r => 
         r.CIDADE === entregaEmEdicao.cidade && 
         r.BAIRRO === entregaEmEdicao.bairro && 
         r.NOME === nomeRua
     );
     
-    // Define a rota encontrada (ou joga 1 se houver alguma inconsistência)
     entregaEmEdicao.rota = ruaEncontrada ? ruaEncontrada.ROTA : "1";
 
-    // Mostra o resumo do endereço selecionado no painel
     let painel = document.getElementById("painel_cascata_botoes");
     if (painel) {
         painel.innerHTML = `
@@ -2498,7 +2488,6 @@ function selecionarRua(nomeRua) {
         `;
     }
 
-    // Atualiza os textos verdes originais (caso existam na sua tela)
     let elCidade = document.getElementById("lbl_cidade") || document.querySelector("[id*='cidade']") || document.querySelector("[id*='Cidade']");
     let elBairro = document.getElementById("lbl_bairro") || document.querySelector("[id*='bairro']") || document.querySelector("[id*='Bairro']");
     let elRua    = document.getElementById("lbl_rua")    || document.querySelector("[id*='rua']")    || document.querySelector("[id*='Rua']");
@@ -2507,20 +2496,17 @@ function selecionarRua(nomeRua) {
     if (elBairro) elBairro.innerText = "Bairro: " + entregaEmEdicao.bairro;
     if (elRua)    elRua.innerText    = "Rua: " + nomeRua + " (Rota: " + entregaEmEdicao.rota + ")";
 
-    // Mostra o formulário de finalização da entrega (Número, Apt, Volumes, Gelado)
     document.getElementById("formulario_final_entrega").style.display = "block";
     
-    // Move o foco para o campo do Número da residência automaticamente
     let campoNumero = document.getElementById("ent_numero") || document.getElementById("numero_residencia") || document.querySelector("input[placeholder*='Número']");
     if (campoNumero) campoNumero.focus();
 }
 
-// Controla a exibição do campo de detalhes do apartamento
 function toggleCampoApartamento(valor) {
     document.getElementById("bloco_detalhe_apto").style.display = (valor === "Sim") ? "block" : "none";
 }
 
-// --- 5. GRAVAÇÃO REAL E CRONOMETRAGEM ---
+// --- 5. GRAVAÇÃO REAL INTEGRADA AO GOOGLE SHEETS ---
 function salvarNovaEntrega() {
     let nomeCliente = document.getElementById("ent_nome_cliente").value.trim().toUpperCase();
     let num = document.getElementById("ent_numero").value.trim().toUpperCase();
@@ -2533,11 +2519,9 @@ function salvarNovaEntrega() {
     if (!num) { alert("⚠️ Informe o número ou digite S/N!"); return; }
     if (apto === "Sim" && !aptoDet) { alert("⚠️ Digite os dados do apartamento!"); return; }
 
-    let entregasAtuais = JSON.parse(localStorage.getItem("registro_entregas")) || [];
-    
-    // Objeto definitivo com carimbo de data e hora para a meta das 4 horas
+    // Cria o objeto de entrega estruturado para a planilha
     let novaEntrega = {
-        idEntrega: Date.now(),
+        idEntrega: Date.now().toString(),
         cliente: nomeCliente,
         cidade: entregaEmEdicao.cidade || "MANHUMIRIM",
         bairro: entregaEmEdicao.bairro,
@@ -2550,188 +2534,243 @@ function salvarNovaEntrega() {
         status: "Pendente",
         dataLancamento: new Date().toLocaleDateString("pt-BR"),
         horaLancamento: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        horaFinalizacao: null,
-        tempoDecorridoMinutos: null,
-        dentroDoPrazo: true
+        horaFinalizacao: "",
+        tempoDecorridoMinutos: "",
+        dentroDoPrazo: "Sim"
     };
 
-    entregasAtuais.push(novaEntrega);
-    localStorage.setItem("registro_entregas", JSON.stringify(entregasAtuais));
+    console.log("Enviando entrega para a planilha do Google...");
 
-    // --- SALVAMENTO AUTOMÁTICO NO CADASTRO DE CLIENTES (A MÁGICA) ---
-    let cadastros = JSON.parse(localStorage.getItem("cadastro_clientes_entrega")) || [];
-    if (!cadastros.some(item => item.nome === nomeCliente)) {
-        cadastros.push({
-            nome: nomeCliente, cidade: novaEntrega.cidade, bairro: novaEntrega.bairro,
-            rua: novaEntrega.rua, numero: num, apartamento: apto, apartamentoDetalhe: aptoDet
-        });
-        localStorage.setItem("cadastro_clientes_entrega", JSON.stringify(cadastros));
-    }
+    // 1. Envia os dados para a aba "LANCAMENTOS" na planilha
+    fetch(`${URL_API}?acao=salvarEntrega`, {
+        method: "POST",
+        body: JSON.stringify(novaEntrega)
+    })
+    .then(response => response.json())
+    .then(res => {
+        if (res.status === "sucesso") {
+            console.log("🚀 Entrega salva com sucesso no Google Sheets!");
+            
+            // 2. Registra o cliente na aba "CADASTRO_CLIENTES" e no backup histórico local
+            let novoClienteData = {
+                cliente: nomeCliente,
+                cidade: novaEntrega.cidade,
+                bairro: novaEntrega.bairro,
+                rua: novaEntrega.rua,
+                numero: num,
+                apto: apto,
+                apto_detalhe: aptoDet
+            };
 
-    alert(`✅ Sucesso!\nTicket Gerado para ${nomeCliente}.\nMeta de Entrega: até às ${calcularHoraLimite(novaEntrega.horaLancamento)}`);
-    abrirAbaLancamentoEntrega(); // Limpa e reinicia para a próxima venda
+            // Mantém backup local do cadastro para busca instantânea rápida (autocompletar)
+            let cadastrosLocais = JSON.parse(localStorage.getItem("cadastro_clientes_entrega")) || [];
+            if (!cadastrosLocais.some(item => item.nome === nomeCliente)) {
+                cadastrosLocais.push({
+                    nome: nomeCliente, cidade: novaEntrega.cidade, bairro: novaEntrega.bairro,
+                    rua: novaEntrega.rua, numero: num, apartamento: apto, apartamentoDetalhe: aptoDet
+                });
+                localStorage.setItem("cadastro_clientes_entrega", JSON.stringify(cadastrosLocais));
+            }
+
+            // Grava na aba do Google Sheets
+            fetch(`${URL_API}?acao=salvarCliente`, {
+                method: "POST",
+                body: JSON.stringify(novoClienteData)
+            })
+            .then(() => {
+                alert(`✅ Sucesso!\nTicket Gerado na Planilha para ${nomeCliente}.\nMeta de Entrega: até às ${calcularHoraLimite(novaEntrega.horaLancamento)}`);
+                abrirAbaLancamentoEntrega(); // Limpa a tela para a próxima venda
+            })
+            .catch(err => console.error("Erro ao salvar cliente na nuvem:", err));
+        } else {
+            alert("⚠️ Erro ao gravar dados na planilha. Tente novamente.");
+        }
+    })
+    .catch(erro => {
+        console.error("⚠️ Falha de conexão com a API do Google:", erro);
+        alert("⚠️ Sem internet ou erro na API. A entrega não foi registrada.");
+    });
 }
 
 function calcularHoraLimite(horaString) {
+    if (!horaString) return "";
     let partes = horaString.split(":");
-    let h = (parseInt(partes[0]) + 4) % 24; // Soma as 4 horas da meta
+    let h = (parseInt(partes[0]) + 4) % 24; // Meta padrão de 4 horas
     return `${h.toString().padStart(2, '0')}:${partes[1]}`;
 }
 
-// --- ABA DO MOTORISTA: ROTEIRO POR COLUNA ROTA (COM CONTADORES E MEMÓRIA DE GAVETA ABERTA) ---
+// --- ABA DO MOTORISTA (ATUALIZADA E SINCRONIZADA COM A NUVEM) ---
 function abrirAbaMotoristaEntrega(rotaParaManterAberta = null) {
     let container = document.querySelector(".container");
     if (!container) return;
 
-    let entregas = JSON.parse(localStorage.getItem("registro_entregas")) || [];
-    
-    // Filtra tudo o que ainda não foi finalizado (Pendente + Em Trânsito)
-    let ativas = entregas.filter(e => e.status === "Pendente" || e.status === "Em Trânsito");
-
-    // Contadores gerenciais do topo
-    let totalNaLoja = entregas.filter(e => e.status === "Pendente").length;
-    let totalNoCarro = entregas.filter(e => e.status === "Em Trânsito").length;
-
-    // Agrupa as entregas por Rota
-    let rotasAgrupadas = {};
-    ativas.forEach(e => {
-        let numRota = e.rota || e.ROTA || "GERAL";
-        let identificadorRota = "ROTA " + numRota;
-        
-        if (!rotasAgrupadas[identificadorRota]) {
-            rotasAgrupadas[identificadorRota] = {
-                entregas: [],
-                totalCaixas: 0,
-                totalGelados: 0
-            };
-        }
-        
-        rotasAgrupadas[identificadorRota].entregas.push(e);
-        rotasAgrupadas[identificadorRota].totalCaixas += parseInt(e.caixas || e.volumes || 0, 10);
-        
-        if (e.gelados === "Sim" || e.GELADOS === "Sim") {
-            rotasAgrupadas[identificadorRota].totalGelados += 1;
-        }
-    });
-
+    // Tela temporária de carregamento
     container.innerHTML = `
-        <div class="topo" style="background:#5cb85c;">
-            <h1>🚚 ROTEIRO DO MOTORISTA</h1>
-            <div style="display:flex; justify-content:space-around; margin-top:10px; font-size:13px; background:rgba(0,0,0,0.1); padding:8px; border-radius:6px;">
-                <span>🏪 Na Loja: <strong>${totalNaLoja} compras</strong></span>
-                <span>🛣️ No Carro: <strong>${totalNoCarro} compras</strong></span>
-            </div>
-        </div>
-
-        <div style="padding: 15px; text-align: left;">
-            
-            ${ativas.length === 0 ? `
-                <div style="text-align:center; padding:30px; color:#666;">
-                    🎉 <b>Excelente!</b> Nenhuma entrega pendente na loja ou no carro.
-                </div>
-            ` : `
-                ${Object.keys(rotasAgrupadas).sort((a, b) => {
-                    let numA = parseInt(a.replace(/\D/g, ''), 10) || 0;
-                    let numB = parseInt(b.replace(/\D/g, ''), 10) || 0;
-                    return numA - numB;
-                }).map(nomeRota => {
-                    let dadosRota = rotasAgrupadas[nomeRota];
-                    
-                    // Verifica se esta gaveta deve iniciar aberta (via clique anterior)
-                    let deveAbrir = (nomeRota === rotaParaManterAberta) ? "open" : "";
-                    
-                    return `
-                    <details ${deveAbrir} id="det-${nomeRota.replace(/\s+/g, '')}" ontoggle="if(this.open) { window.lastOpenedRoute = '${nomeRota}'; }" style="background:#fff; border:1px solid #ddd; border-radius:8px; margin-bottom:15px; box-shadow:0 2px 4px rgba(0,0,0,0.05); overflow:hidden;">
-                        
-                        <summary style="background:#e2f0d9; color:#385723; padding:12px; font-weight:bold; font-size:14px; border-bottom:1px solid #bcd; line-height:1.5; cursor:pointer; outline:none;">
-                            <span style="font-size:15px; display:block; margin-bottom:4px;">📍 ${nomeRota.toUpperCase()}</span>
-                            📋 Entregas ${dadosRota.entregas.length}<br>
-                            📦 Caixas ${dadosRota.totalCaixas}
-                            ${dadosRota.totalGelados > 0 ? `<br>❄️ Gelado ${dadosRota.totalGelados}` : ''}
-                        </summary>
-                        
-                        <div style="padding:10px; background:#fdfdfd;">
-                            ${dadosRota.entregas.map(item => {
-                                let noCarro = item.status === "Em Trânsito";
-                                return `
-                                <div style="padding:12px 0; border-bottom:1px solid #eee; background:${noCarro ? '#f7faff' : 'transparent'}; border-left: ${noCarro ? '4px solid #0275d8' : 'none'}; padding-left: ${noCarro ? '8px' : '0px'};">
-                                    <span style="font-size:11px; color:#777; float:right;">⏱️ ${item.horaLancamento || ''}</span>
-                                    
-                                    <span style="font-size:11px; float:right; margin-right:10px; background:${noCarro ? '#0275d8' : '#e67e22'}; color:white; padding:1px 5px; border-radius:4px; font-weight:bold;">
-                                        ${noCarro ? '🛣️ NO CARRO' : '🏪 NA LOJA'}
-                                    </span>
-
-                                    <strong style="font-size:15px; color:#333;">👤 ${item.cliente}</strong>
-                                    <p style="margin:4px 0; font-size:13px; color:#555;">
-                                        🏠 ${item.rua}, Nº ${item.numero} ${item.apartamento === 'Sim' ? '<b>(' + (item.apartamentoDetalhe || item.detalheApto || '') + ')</b>' : ''}
-                                    </p>
-                                    <p style="margin:2px 0; font-size:12px; color:#888;">🏡 Bairro: ${item.bairro} | 🏙️ ${item.cidade || ''}</p>
-                                    
-                                    <div style="margin:5px 0; font-size:13px;">
-                                        📦 <b>Volumes:</b> <span style="background:#ddd; padding:2px 6px; border-radius:4px; font-weight:bold;">${item.caixas || item.volumes || 0}</span>
-                                        ${item.gelados === 'Sim' ? `<span style="background:#b0cedb; color:#0c5460; padding:2px 6px; border-radius:4px; font-weight:bold; margin-left:5px; font-size:11px;">❄️ Contém Gelados</span>` : ''}
-                                    </div>
-
-                                    <div style="margin-top:10px;">
-                                        ${!noCarro ? `
-                                            <button onclick="inserirCompraNaRota(${item.idEntrega || item.id}, '${nomeRota}')" style="width:100%; padding:8px; background:#0275d8; color:white; border:none; border-radius:4px; font-weight:bold; font-size:12px; cursor:pointer;">
-                                                🚚 Inserir esta compra no Carro
-                                            </button>
-                                        ` : `
-                                            <div style="display:flex; gap:5px;">
-                                                <button onclick="mudarStatusEntrega(${item.idEntrega || item.id}, 'Entregue', '${nomeRota}')" style="flex:1; padding:8px; background:#28a745; color:white; border:none; border-radius:4px; font-weight:bold; font-size:12px; cursor:pointer;">✅ Entregue</button>
-                                                <button onclick="mudarStatusEntrega(${item.idEntrega || item.id}, 'Não Recebida', '${nomeRota}')" style="flex:1; padding:8px; background:#f0ad4e; color:white; border:none; border-radius:4px; font-weight:bold; font-size:12px; cursor:pointer;">❌ Não Rec.</button>
-                                                <button onclick="mudarStatusEntrega(${item.idEntrega || item.id}, 'Não Localizada', '${nomeRota}')" style="flex:1; padding:8px; background:#d9534f; color:white; border:none; border-radius:4px; font-weight:bold; font-size:12px; cursor:pointer;">📍 Não Loc.</button>
-                                            </div>
-                                        `}
-                                    </div>
-                                </div>
-                                `;
-                            }).join("")}
-                        </div>
-                    </details>
-                    `;
-                }).join("")}
-            `}
-
-            <button onclick="voltarMenuPrincipal()" style="width:100%; padding:12px; background:#6c757d; color:white; border:none; border-radius:6px; margin-top:15px; cursor:pointer; font-weight:bold; font-size:14px;">
-                ↩ Voltar ao Menu
-            </button>
+        <div style="text-align:center; padding:40px; color:#333;">
+            <p style="font-size:18px; font-weight:bold;">⏳ Buscando roteiro na nuvem...</p>
+            <p style="font-size:13px; color:#666;">Sincronizando entregas diretamente do Google Sheets.</p>
         </div>
     `;
+
+    // Sincroniza puxando os dados ativos da aba de lançamentos da planilha
+    fetch(`${URL_API}?acao=buscarEntregas`)
+    .then(response => response.json())
+    .then(entregasGlobaisCompartilhadas => {
+        
+        let ativas = entregasGlobaisCompartilhadas.filter(e => e.status === "Pendente" || e.status === "Em Trânsito");
+        let totalNaLoja = entregasGlobaisCompartilhadas.filter(e => e.status === "Pendente").length;
+        let totalNoCarro = entregasGlobaisCompartilhadas.filter(e => e.status === "Em Trânsito").length;
+
+        let rotasAgrupadas = {};
+        
+        // Agrupa as entregas em suas respectivas rotas de forma inteligente
+        ativas.forEach(e => {
+            let numRota = e.rota || e.ROTA || "GERAL";
+            let identificadorRota = "ROTA " + numRota.toString().trim().toUpperCase();
+            
+            if (!rotasAgrupadas[identificadorRota]) {
+                rotasAgrupadas[identificadorRota] = { entregas: [], totalCaixas: 0, totalGelados: 0 };
+            }
+            rotasAgrupadas[identificadorRota].entregas.push(e);
+            rotasAgrupadas[identificadorRota].totalCaixas += parseInt(e.caixas || e.volumes || 0, 10);
+            if (e.gelados && e.gelados.toString().toUpperCase() === "SIM") {
+                rotasAgrupadas[identificadorRota].totalGelados += 1;
+            }
+        });
+
+        // Monta o visual estruturado do Roteiro
+        container.innerHTML = `
+            <div class="topo" style="background:#5cb85c; padding: 15px; text-align: center; color: white;">
+                <h1 style="margin:0; font-size:20px;">🚚 ROTEIRO COMPARTILHADO</h1>
+                <div style="display:flex; justify-content:space-around; margin-top:10px; font-size:12px; background:rgba(0,0,0,0.15); padding:6px; border-radius:6px;">
+                    <span>🏪 Na Loja: <strong>${totalNaLoja}</strong></span>
+                    <span>🛣️ No Carro: <strong>${totalNoCarro}</strong></span>
+                </div>
+            </div>
+
+            <div style="padding: 15px; text-align: left;">
+                <button onclick="abrirAbaMotoristaEntrega()" style="width:100%; padding:11px; background:#0275d8; color:white; border:none; border-radius:6px; margin-bottom:15px; font-weight:bold; cursor:pointer; font-size:14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    🔄 ATUALIZAR ROTEIRO
+                </button>
+                
+                ${ativas.length === 0 ? `
+                    <div style="text-align:center; padding:40px 20px; color:#666; background:#fff; border-radius:8px; border:1px solid #eee;">
+                        🎉 <b style="font-size:16px; color:#28a745; display:block; margin-bottom:5px;">Roteiro Zerado!</b> Nenhuma entrega pendente na planilha do Google.
+                    </div>
+                ` : `
+                    ${Object.keys(rotasAgrupadas).sort((a, b) => {
+                        let numA = parseInt(a.replace(/\D/g, ''), 10) || 0;
+                        let numB = parseInt(b.replace(/\D/g, ''), 10) || 0;
+                        return numA - numB;
+                    }).map(nomeRota => {
+                        let dadosRota = rotasAgrupadas[nomeRota];
+                        let deveAbrir = (nomeRota === rotaParaManterAberta) ? "open" : "";
+                        
+                        return `
+                        <details ${deveAbrir} id="det-${nomeRota.replace(/\s+/g, '')}" ontoggle="if(this.open) { window.lastOpenedRoute = '${nomeRota}'; }" style="background:#fff; border:1px solid #ddd; border-radius:8px; margin-bottom:12px; box-shadow:0 2px 4px rgba(0,0,0,0.05); overflow:hidden;">
+                            <summary style="background:#e2f0d9; color:#385723; padding:12px; font-weight:bold; font-size:14px; border-bottom:1px solid #bcd; line-height:1.4; cursor:pointer; outline:none;">
+                                <span style="font-size:15px; display:block; margin-bottom:2px;">📍 ${nomeRota}</span>
+                                📋 Entregas: ${dadosRota.entregas.length} | 📦 Volumes: ${dadosRota.totalCaixas}
+                                ${dadosRota.totalGelados > 0 ? `<br><span style="color:#0c5460;">❄️ Gelados: ${dadosRota.totalGelados}</span>` : ''}
+                            </summary>
+                            
+                            <div style="padding:10px; background:#fdfdfd;">
+                                ${dadosRota.entregas.map(item => {
+                                    let noCarro = item.status === "Em Trânsito";
+                                    return `
+                                    <div style="padding:12px 5px; border-bottom:1px solid #eee; background:${noCarro ? '#f7faff' : 'transparent'}; border-left: ${noCarro ? '4px solid #0275d8' : 'none'}; padding-left: ${noCarro ? '8px' : '5px'};">
+                                        <span style="font-size:10px; color:#777; float:right;">⏱️ ${item.horaLancamento || ''}</span>
+                                        <span style="font-size:10px; float:right; margin-right:8px; background:${noCarro ? '#0275d8' : '#e67e22'}; color:white; padding:1px 5px; border-radius:4px; font-weight:bold;">
+                                            ${noCarro ? '🛣️ NO CARRO' : '🏪 NA LOJA'}
+                                        </span>
+
+                                        <strong style="font-size:14px; color:#333;">👤 ${item.cliente}</strong>
+                                        <p style="margin:4px 0; font-size:13px; color:#555;">
+                                            🏠 ${item.rua}, Nº ${item.numero} ${item.apartamento === 'Sim' ? '<b>(' + (item.apartamentoDetalhe || item.detalheApto || '') + ')</b>' : ''}
+                                        </p>
+                                        <p style="margin:2px 0; font-size:11px; color:#888;">🏡 Bairro: ${item.bairro} | 🏙️ ${item.cidade || ''}</p>
+                                        
+                                        <div style="margin:5px 0; font-size:12px;">
+                                            📦 <b>Volumes:</b> <span style="background:#ddd; padding:1px 5px; border-radius:4px; font-weight:bold;">${item.caixas || item.volumes || 0}</span>
+                                            ${item.gelados === 'Sim' ? `<span style="background:#b0cedb; color:#0c5460; padding:1px 5px; border-radius:4px; font-weight:bold; margin-left:5px; font-size:10px;">❄️ Gelados</span>` : ''}
+                                        </div>
+
+                                        <div style="margin-top:10px;">
+                                            ${!noCarro ? `
+                                                <button onclick="inserirCompraNaRota('${item.idEntrega || item.id}', '${nomeRota}')" style="width:100%; padding:8px; background:#0275d8; color:white; border:none; border-radius:4px; font-weight:bold; font-size:12px; cursor:pointer;">
+                                                    🚚 Inserir no Carro
+                                                </button>
+                                            ` : `
+                                                <div style="display:flex; gap:4px;">
+                                                    <button onclick="mudarStatusEntregaNaPlanilha('${item.idEntrega || item.id}', 'Entregue', '${nomeRota}')" style="flex:1; padding:8px; background:#28a745; color:white; border:none; border-radius:4px; font-weight:bold; font-size:11px; cursor:pointer;">✅ Entregue</button>
+                                                    <button onclick="mudarStatusEntregaNaPlanilha('${item.idEntrega || item.id}', 'Não Recebida', '${nomeRota}')" style="flex:1; padding:8px; background:#f0ad4e; color:white; border:none; border-radius:4px; font-weight:bold; font-size:11px; cursor:pointer;">❌ Não Rec.</button>
+                                                    <button onclick="mudarStatusEntregaNaPlanilha('${item.idEntrega || item.id}', 'Não Localizada', '${nomeRota}')" style="flex:1; padding:8px; background:#d9534f; color:white; border:none; border-radius:4px; font-weight:bold; font-size:11px; cursor:pointer;">📍 Não Loc.</button>
+                                                </div>
+                                            `}
+                                        </div>
+                                    </div>
+                                    `;
+                                }).join("")}
+                            </div>
+                        </details>
+                        `;
+                    }).join("")}
+                `}
+
+                <button onclick="voltarMenuPrincipal()" style="width:100%; padding:12px; background:#6c757d; color:white; border:none; border-radius:6px; margin-top:15px; cursor:pointer; font-weight:bold; font-size:14px;">
+                    ↩ Voltar ao Menu
+                </button>
+            </div>
+        `;
+    })
+    .catch(erro => {
+        console.error("Erro ao buscar entregas da planilha:", erro);
+        container.innerHTML = `
+            <div style="text-align:center; padding:30px; color:#d9534f;">
+                ⚠️ Falha ao carregar as entregas da planilha. Verifique sua conexão com a internet.
+                <button onclick="abrirAbaMotoristaEntrega()" style="width:100%; padding:12px; background:#0275d8; color:white; border:none; border-radius:6px; margin-top:15px; cursor:pointer; font-weight:bold; font-size:14px;">
+                    Tentar Novamente
+                </button>
+            </div>
+        `;
+    });
 }
 
-// --- FUNÇÃO PARA INSERIR UMA COMPRA INDIVIDUAL NO CARRO ---
+// --- FUNÇÃO PARA INSERIR UMA COMPRA NO CARRO (NUVEM) ---
 function inserirCompraNaRota(idEntrega, nomeRota) {
-    let entregas = JSON.parse(localStorage.getItem("registro_entregas")) || [];
-    let item = entregas.find(e => (e.idEntrega || e.id) == idEntrega);
-
-    if (item) {
-        item.status = "Em Trânsito";
-        localStorage.setItem("registro_entregas", JSON.stringify(entregas));
-        // Recarrega mantendo a mesma gaveta de rota aberta
-        abrirAbaMotoristaEntrega(nomeRota || window.lastOpenedRoute); 
-    }
+    mudarStatusEntregaNaPlanilha(idEntrega, "Em Trânsito", nomeRota);
 }
 
-// --- MUDANÇA DE STATUS DA ENTREGA (MOTORISTA) ---
-function mudarStatusEntrega(idEntrega, novoStatus, nomeRota) {
-    let entregas = JSON.parse(localStorage.getItem("registro_entregas")) || [];
-    let entregaEncontrada = entregas.find(e => (e.idEntrega || e.id) == idEntrega);
-    
-    if (entregaEncontrada) {
-        entregaEncontrada.status = novoStatus;
-        
-        if (novoStatus === 'Entregue') {
-            entregaEncontrada.horaFinalizacao = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        }
-        
-        localStorage.setItem("registro_entregas", JSON.stringify(entregas));
-        
-        alert(`📦 Entrega de ${entregaEncontrada.cliente} marcada como: ${novoStatus}!`);
-        // Recarrega mantendo a mesma gaveta de rota aberta para finalizar as próximas se houver
-        abrirAbaMotoristaEntrega(nomeRota || window.lastOpenedRoute);
-    } else {
-        alert("⚠️ Erro: Entrega não encontrada na base de dados.");
+// --- MUDANÇA DE STATUS DA ENTREGA COM ENVIO PARA O GOOGLE SHEETS ---
+function mudarStatusEntregaNaPlanilha(idEntrega, novoStatus, nomeRota) {
+    let horaFinalizacao = "";
+    if (novoStatus === 'Entregue') {
+        horaFinalizacao = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
+
+    let dadosAtualizacao = {
+        idEntrega: idEntrega.toString(),
+        status: novoStatus,
+        horaFinalizacao: horaFinalizacao
+    };
+
+    console.log(`Enviando atualização do ID ${idEntrega} para: ${novoStatus}`);
+
+    fetch(`${URL_API}?acao=atualizarStatus`, {
+        method: "POST",
+        body: JSON.stringify(dadosAtualizacao)
+    })
+    .then(response => response.json())
+    .then(res => {
+        if (res.status === "sucesso") {
+            alert(`📦 Entrega atualizada com sucesso na planilha para: ${novoStatus}!`);
+            abrirAbaMotoristaEntrega(nomeRota || window.lastOpenedRoute);
+        } else {
+            alert("⚠️ A planilha rejeitou a atualização do status.");
+        }
+    })
+    .catch(erro => {
+        console.error("Erro ao atualizar status na nuvem:", erro);
+        alert("⚠️ Falha de rede. Não foi possível salvar o status na planilha.");
+    });
 }
