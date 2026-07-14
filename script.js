@@ -1,6 +1,6 @@
 // --- CONEXÃO COM O BANCO DE DADOS DO GOOGLE SHEETS ---
 let baseRuasGlobal = []; // Substituirá a base_ruas_entrega do localStorage antigo
-const URL_API = "https://script.google.com/macros/s/AKfycbwqsis8lmfOe95to0IL2h7gDo4EVNYa9_Ey5P3cL7l0_o-YZHoNsTHQ8gfz6phM2J53/exec";
+const URL_API = "https://script.google.com/macros/s/AKfycbwd_Ef_qL9K7A29xdG4SDEl1_G7tOpuv4yNGMDI-tO_MQXh9bzx7CBeVv-cspZeDTv9/exec";
 
 // Função para buscar as ruas na nuvem automaticamente ao iniciar o App
 function inicializarBancoDeRuas() {
