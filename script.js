@@ -1,14 +1,13 @@
 // --- CONEXÃO COM O BANCO DE DADOS DO GOOGLE SHEETS ---
 let baseRuasGlobal = []; // Substituirá a base_ruas_entrega do localStorage antigo
-const URL_GOOGLE_SHEETS = "https://script.google.com/macros/s/AKfycbwqsis8lmfOe95to0IL2h7gDo4EVNYa9_Ey5P3cL7l0_o-YZHoNsTHQ8gfz6phM2J53/exec";
+const URL_API = "https://script.google.com/macros/s/AKfycbwqsis8lmfOe95to0IL2h7gDo4EVNYa9_Ey5P3cL7l0_o-YZHoNsTHQ8gfz6phM2J53/exec";
 
 // Função para buscar as ruas na nuvem automaticamente ao iniciar o App
 function inicializarBancoDeRuas() {
-    fetch(URL_GOOGLE_SHEETS)
+    fetch(`${URL_API}?acao=buscarRuas`)
         .then(response => response.json())
         .then(dados => {
-            // Seus dados chegam formatados: { cidade: "...", bairro: "...", rua: "...", rota: "..." }
-            // Mapeamos para o formato em CAIXA ALTA esperado pelo restante do seu código
+            // Seus dados chegam formatados...
             baseRuasGlobal = dados.map(item => ({
                 CIDADE: item.cidade.toUpperCase(),
                 BAIRRO: item.bairro.toUpperCase(),
@@ -19,7 +18,6 @@ function inicializarBancoDeRuas() {
         })
         .catch(erro => {
             console.error("⚠️ Falha ao buscar ruas do Google Sheets, usando backup local:", erro);
-            // Backup de segurança: se a internet falhar, busca o que tiver no localStorage
             let backupLocal = JSON.parse(localStorage.getItem("base_ruas_entrega")) || [];
             baseRuasGlobal = backupLocal;
         });
