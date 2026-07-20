@@ -1,3 +1,46 @@
+// --- CONFIGURAÇÃO DA API ---
+const URL_API = "https://script.google.com/macros/s/AKfycbykcWGN0f38oAR5wwgkuVLaCaBv0baDK4uCODUg3Cf9Fpa3i3-VQAnzdiGpVdfnan99/exec";
+
+// --- FUNÇÃO PARA SALVAR NA NUVEM E LOCALMENTE ---
+async function salvarDiaDaGestaoNoHist() {
+    let historico = JSON.parse(localStorage.getItem("gondola_historico_checklists")) || [];
+
+    let analiseGestao = {
+        idSessao: Date.now(),
+        setor: "Checklist Operacional",
+        tipoMissao: "DIA_GESTAO",
+        usuario: (typeof usuarioAtual !== "undefined" && usuarioAtual) ? usuarioAtual : "Administrador",
+        data: new Date().toLocaleDateString("pt-BR"),
+        hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        nota: 100,
+        totalPerguntas: 1,
+        conformes: 1,
+        itensRespondidos: [{
+            perguntaTexto: "Hoje é o dia da gestão, analise o comportamento da loja/missões, veja quais as pendencias.",
+            setor: "Estratégico",
+            resposta: "OK",
+            observacao: "Auditoria analítica realizada pós-global"
+        }]
+    };
+
+    // 1. Salva no armazenamento local do navegador
+    historico.push(analiseGestao);
+    localStorage.setItem("gondola_historico_checklists", JSON.stringify(historico));
+
+    // 2. Envia para o Google Sheets via API
+    try {
+        await fetch(URL_API, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(analiseGestao)
+        });
+        console.log("Dados sincronizados com sucesso!");
+    } catch (error) {
+        console.error("Erro ao sincronizar com a nuvem:", error);
+    }
+}
+
 // ==========================================
 // 1. BANCOS DE DADOS SEPARADOS (Memória Local)
 // ==========================================
