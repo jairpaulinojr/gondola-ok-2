@@ -814,27 +814,57 @@ function abrirAbaValidade() {
     }, (erro) => {});
 }
 
-function buscarProdutoValidade(codigoBarras) {
-    let baseMestre = JSON.parse(localStorage.getItem("gondola_base_global")) || [];
-    let produtoEncontrado = baseMestre.find(p => p.codigo === codigoBarras.trim());
-
+async function buscarProdutoValidade(codigoBarras) {
+    let codigoLimpo = codigoBarras ? codigoBarras.trim() : "";
     let display = document.getElementById("resultado-validade");
     display.style.display = "block";
 
-    if (!produtoEncontrado) {
-        display.innerHTML = `<p style="color:red; text-align:center;">❌ Produto não localizado no Cadastro Mestre Global.</p>`;
+    if (!codigoLimpo) {
+        display.innerHTML = `<p style="color:red; text-align:center;">❌ Digite ou escaneie um código válido.</p>`;
         return;
     }
 
-    display.innerHTML = `
-        <p><strong>Produto:</strong> ${produtoEncontrado.descricao}</p>
-        <p><strong>Código:</strong> ${produtoEncontrado.codigo}</p>
-        <label><strong>Data de Vencimento:</strong></label>
-        <input type="date" id="data-venc" style="width:100%; padding:8px; margin: 10px 0;">
-        <label><strong>Quantidade:</strong></label>
-        <input type="number" id="qtd-venc" value="1" style="width:100%; padding:8px; margin: 10px 0;">
-        <button onclick="salvarDataValidade('${produtoEncontrado.codigo}', '${produtoEncontrado.descricao.replace(/'/g, "\\'")}')" style="background:#28a745; color:white; width:100%;">Salvar Data e Qtd</button>
-    `;
+    display.innerHTML = `<p style="text-align:center; color:#6c757d;">🔍 Buscando produto na planilha...</p>`;
+
+    try {
+        let resposta = await fetch(`${URL_API_GAS}?acao=buscarProduto&codigo=${codigoLimpo}`);
+        let resultado = await resposta.json();
+
+        if (!resultado || !resultado.encontrado) {
+            display.innerHTML = `<p style="color:red; text-align:center;">❌ Produto não localizado no Cadastro Geral da Planilha.</p>`;
+            return;
+        }
+
+        let produtoEncontrado = resultado.produto;
+
+        display.innerHTML = `
+            <p><strong>Produto:</strong> ${produtoEncontrado.descricao}</p>
+            <p><strong>Código:</strong> ${produtoEncontrado.codigo}</p>
+            <label><strong>Data de Vencimento:</strong></label>
+            <input type="date" id="data-venc" style="width:100%; padding:8px; margin: 10px 0;">
+            <label><strong>Quantidade:</strong></label>
+            <input type="number" id="qtd-venc" value="1" style="width:100%; padding:8px; margin: 10px 0;">
+            <button onclick="salvarDataValidade('${produtoEncontrado.codigo}', '${produtoEncontrado.descricao.replace(/'/g, "\\'")}')" style="background:#28a745; color:white; width:100%;">Salvar Data e Qtd</button>
+        `;
+    } catch (e) {
+        let baseMestre = JSON.parse(localStorage.getItem("gondola_base_global")) || [];
+        let produtoEncontrado = baseMestre.find(p => p.codigo === codigoLimpo);
+
+        if (!produtoEncontrado) {
+            display.innerHTML = `<p style="color:red; text-align:center;">❌ Erro ao consultar a planilha e produto não encontrado localmente.</p>`;
+            return;
+        }
+
+        display.innerHTML = `
+            <p><strong>Produto:</strong> ${produtoEncontrado.descricao}</p>
+            <p><strong>Código:</strong> ${produtoEncontrado.codigo}</p>
+            <label><strong>Data de Vencimento:</strong></label>
+            <input type="date" id="data-venc" style="width:100%; padding:8px; margin: 10px 0;">
+            <label><strong>Quantidade:</strong></label>
+            <input type="number" id="qtd-venc" value="1" style="width:100%; padding:8px; margin: 10px 0;">
+            <button onclick="salvarDataValidade('${produtoEncontrado.codigo}', '${produtoEncontrado.descricao.replace(/'/g, "\\'")}')" style="background:#28a745; color:white; width:100%;">Salvar Data e Qtd</button>
+        `;
+    }
 }
 
 function salvarDataValidade(codigo, descricao) {
@@ -859,14 +889,33 @@ function salvarDataValidade(codigo, descricao) {
     alert("Salvo! Quantidade: " + qtd);
     abrirAbaValidade(); 
 }
+// ==========================================
+// 10. REPOSITOR: ABA PREÇOS (MANUAL) - NUVEM / GOOGLE SHEETS
+// ==========================================
+async function abrirAbaEtiquetas() {
+    document.querySelector(".container").innerHTML = `
+        <div class="topo">
+            <h1>🏷️ PRODUTOS SEM PREÇO</h1>
+            <p>Carregando dados da nuvem...</p>
+        </div>
+        <div class="login" style="max-width:100%; text-align:center; padding: 20px;">
+            <p style="color:#6c757d;">⏳ Sincronizando com a planilha...</p>
+        </div>
+    `;
 
-// ==========================================
-// 10. REPOSITOR: ABA PREÇOS (MANUAL)
-// ==========================================
-function abrirAbaEtiquetas() {
-    let etiquetas = JSON.parse(localStorage.getItem("etiquetas_pendentes")) || [];
+    let etiquetas = [];
+    try {
+        let resposta = await fetch(`${URL_API_GAS}?acao=listarEtiquetas`);
+        let resultado = await resposta.json();
+        if (resultado && resultado.etiquetas) {
+            etiquetas = resultado.etiquetas;
+        }
+    } catch (e) {
+        // Fallback local se a rede falhar momentaneamente
+        etiquetas = JSON.parse(localStorage.getItem("etiquetas_pendentes")) || [];
+    }
+
     let lines = "";
-
     if (etiquetas.length === 0) {
         lines = `<tr><td colspan="2" style="text-align:center; padding:20px; color: green; font-weight: bold;">🎉 Nenhum produto sem preço pendente!</td></tr>`;
     } else {
@@ -880,7 +929,7 @@ function abrirAbaEtiquetas() {
                         </span>
                     </td>
                     <td style="padding:12px; text-align:center; width: 90px;">
-                        <button onclick="darBaixaEtiquetaManual(${idx})" style="background:#28a745; color:white; padding:8px 10px; font-size:12px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">
+                        <button onclick="darBaixaEtiquetaNuvem('${e.codigo}')" style="background:#28a745; color:white; padding:8px 10px; font-size:12px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">
                             ✓ Feito
                         </button>
                     </td>
@@ -892,11 +941,11 @@ function abrirAbaEtiquetas() {
     document.querySelector(".container").innerHTML = `
         <div class="topo">
             <h1>🏷️ PRODUTOS SEM PREÇO</h1>
-            <p>Copie o código para emitir manualmente no seu sistema</p>
+            <p>Sincronizado com a Planilha Geral</p>
         </div>
         <div class="login" style="max-width:100%; padding: 0;">
             <div style="background: #e2e3e5; padding: 10px; border-radius: 5px; margin-bottom: 15px; font-size: 13px; color: #383d41; text-align: center;">
-                📋 <strong>Total pendente: ${etiquetas.length} itens</strong>
+                📋 <strong>Total pendente na nuvem: ${etiquetas.length} itens</strong>
             </div>
             
             <table style="width:100%; border-collapse:collapse; text-align:left; background: white;">
@@ -914,39 +963,80 @@ function abrirAbaEtiquetas() {
     `;
 }
 
-function darBaixaEtiquetaManual(index) {
-    let etiquetas = JSON.parse(localStorage.getItem("etiquetas_pendentes")) || [];
-    etiquetas.splice(index, 1);
-    localStorage.setItem("etiquetas_pendentes", JSON.stringify(etiquetas));
+async function darBaixaEtiquetaNuvem(codigoProduto) {
+    if (!confirm("Deseja realmente dar baixa nesta etiqueta?")) return;
+
+    document.querySelector(".container").innerHTML = `
+        <div class="topo">
+            <h1>🏷️ PRODUTOS SEM PREÇO</h1>
+            <p>Atualizando na nuvem...</p>
+        </div>
+        <div class="login" style="max-width:100%; text-align:center; padding: 20px;">
+            <p style="color:#6c757d;">⏳ Salvando alteração na planilha...</p>
+        </div>
+    `;
+
+    try {
+        await fetch(`${URL_API_GAS}?acao=darBaixaEtiqueta&codigo=${codigoProduto}`, {
+            method: 'POST'
+        });
+    } catch (e) {
+        // Se falhar o envio online, remove localmente para garantia do operador
+        let etiquetas = JSON.parse(localStorage.getItem("etiquetas_pendentes")) || [];
+        etiquetas = etiquetas.filter(e => e.codigo !== codigoProduto);
+        localStorage.setItem("etiquetas_pendentes", JSON.stringify(etiquetas));
+    }
+
+    // Recarrega a tela atualizada direto da nuvem
     abrirAbaEtiquetas();
 }
+// ==========================================
+// 11. GESTÃO DE VALIDADES: GERENTE (FILTRADO POR HOJE) - NUVEM / GOOGLE SHEETS
+// ==========================================
+async function abrirRelatorioValidadesGerente() {
+    document.querySelector(".container").innerHTML = `
+        <div class="topo"><h1>📅 GESTÃO DE VALIDADES</h1></div>
+        <div class="login" style="max-width: 100%; text-align: center; padding: 20px;">
+            <p style="color:#6c757d;">⏳ Carregando relatórios de validade da nuvem...</p>
+        </div>
+    `;
 
-// ==========================================
-// 11. GESTÃO DE VALIDADES: GERENTE (FILTRADO POR HOJE)
-// ==========================================
-function abrirRelatorioValidadesGerente() {
-    let todosRegistros = JSON.parse(localStorage.getItem("registro_validades")) || [];
+    let todosRegistros = [];
     let hojeStr = new Date().toLocaleDateString();
+
+    try {
+        let resposta = await fetch(`${URL_API_GAS}?acao=listarValidades`);
+        let resultado = await resposta.json();
+        if (resultado && resultado.registros) {
+            todosRegistros = resultado.registros;
+        }
+    } catch (e) {
+        todosRegistros = JSON.parse(localStorage.getItem("registro_validades")) || [];
+    }
     
     let registros = todosRegistros.filter(r => r.status !== "Resolvido" && r.dataRegistro === hojeStr); 
     let linhas = "";
 
-    registros.forEach((r) => {
-        let estiloTratado = r.status === "Tratado" ? "background:#e8f4fd;" : "background:#ffffff;";
-        let qtd = r.quantidade || 1; 
+    if (registros.length === 0) {
+        linhas = `<tr><td colspan="4" style="text-align:center; padding:20px; color: green; font-weight: bold;">🎉 Nenhum registro de validade pendente para hoje!</td></tr>`;
+    } else {
+        registros.forEach((r) => {
+            let estiloTratado = r.status === "Tratado" ? "background:#e8f4fd;" : "background:#ffffff;";
+            let qtd = r.quantidade || 1; 
 
-        linhas += `
-            <tr style="${estiloTratado} border-bottom: 1px solid #ddd; font-size: 13px;">
-                <td style="padding: 10px;"><strong>${r.descricao}</strong><br><small>Cód: ${r.codigo}</small></td>
-                <td style="padding: 10px; text-align:center; color:red; font-weight:bold;">${r.dataValidade}</td>
-                <td style="padding: 10px; text-align:center;">${qtd}</td>
-                <td style="padding: 10px; text-align:center;">
-                    <button onclick="atualizarStatus('${r.codigo}', '${r.dataValidade}', 'Tratado')" style="background:#007bff; color:white; border:none; padding:5px; margin:2px; cursor:pointer;">Tratar</button>
-                    <button onclick="atualizarStatus('${r.codigo}', '${r.dataValidade}', 'Resolvido')" style="background:#28a745; color:white; border:none; padding:5px; margin:2px; cursor:pointer;">Resolver</button>
-                </td>
-            </tr>
-        `;
-    });
+            linhas += `
+                <tr style="${estiloTratado} border-bottom: 1px solid #ddd; font-size: 13px;">
+                    <td style="padding: 10px;"><strong>${r.descricao}</strong><br><small>Cód: ${r.codigo}</small></td>
+                    <td style="padding: 10px; text-align:center; color:red; font-weight:bold;">${r.dataValidade}</td>
+                    <td style="padding: 10px; text-align:center;">${qtd}</td>
+                    <td style="padding: 10px; text-align:center;">
+                        <button onclick="atualizarStatusNuvem('${r.codigo}', '${r.dataValidade}', 'Tratado')" style="background:#007bff; color:white; border:none; padding:5px; margin:2px; cursor:pointer;">Tratar</button>
+                        <button onclick="atualizarStatusNuvem('${r.codigo}', '${r.dataValidade}', 'Resolvido')" style="background:#28a745; color:white; border:none; padding:5px; margin:2px; cursor:pointer;">Resolver</button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
 
     document.querySelector(".container").innerHTML = `
         <div class="topo"><h1>📅 GESTÃO DE VALIDADES</h1></div>
@@ -962,20 +1052,26 @@ function abrirRelatorioValidadesGerente() {
     `;
 }
 
-window.atualizarStatus = function(codigo, dataValidade, novoStatus) {
-    let registros = JSON.parse(localStorage.getItem("registro_validades")) || [];
-    let item = registros.find(r => r.codigo === codigo && r.dataValidade === dataValidade);
-    
-    if (item) {
-        item.status = novoStatus;
-        localStorage.setItem("registro_validades", JSON.stringify(registros));
-        alert("Status: " + novoStatus);
-        abrirRelatorioValidadesGerente();
-    } else {
-        alert("Erro ao localizar item.");
-    }
-};
+window.atualizarStatusNuvem = async function(codigo, dataValidade, novoStatus) {
+    if (!confirm(`Deseja alterar o status para "${novoStatus}"?`)) return;
 
+    try {
+        await fetch(`${URL_API_GAS}?acao=atualizarStatusValidade&codigo=${codigo}&dataValidade=${dataValidade}&status=${novoStatus}`, {
+            method: 'POST'
+        });
+        alert("Status atualizado na nuvem: " + novoStatus);
+    } catch (e) {
+        let registros = JSON.parse(localStorage.getItem("registro_validades")) || [];
+        let item = registros.find(r => r.codigo === codigo && r.dataValidade === dataValidade);
+        if (item) {
+            item.status = novoStatus;
+            localStorage.setItem("registro_validades", JSON.stringify(registros));
+        }
+        alert("Status atualizado localmente: " + novoStatus);
+    }
+    
+    abrirRelatorioValidadesGerente();
+};
 // ==========================================
 // 12. GERENTE: SELEÇÃO DE ABAS AUDITORIA
 // ==========================================
@@ -1002,22 +1098,44 @@ function abrirMenuSetoresGerente() {
     `;
 }
 // ==========================================
-// 13. GERENTE: FILA WITH ITENS COM RUPTURA ATIVA
+// 13. GERENTE: FILA COM ITENS COM RUPTURA ATIVA - NUVEM / GOOGLE SHEETS
 // ==========================================
-function abrirAbaGerente(setorFiltro) {
-    let dados = JSON.parse(localStorage.getItem("gondola_dados")) || [];
-    let rupturasPendentesSetor = dados.filter(p => p.setor === setorFiltro && p.statusRuptura === true && p.tratadoRuptura !== true);
+async function abrirAbaGerente(setorFiltro) {
+    document.querySelector(".container").innerHTML = `
+        <div class="topo">
+            <h1>🚨 RUPTURAS: ${setorFiltro.toUpperCase()}</h1>
+            <p>Carregando dados da nuvem...</p>
+        </div>
+        <div class="login" style="max-width: 100%; text-align: center; padding: 20px;">
+            <p style="color:#6c757d;">⏳ Buscando rupturas pendentes...</p>
+        </div>
+    `;
+
+    let dados = [];
+    try {
+        let resposta = await fetch(`${URL_API_GAS}?acao=listarRupturas&setor=${encodeURIComponent(setorFiltro)}`);
+        let resultado = await resposta.json();
+        if (resultado && resultado.rupturas) {
+            dados = resultado.rupturas;
+        }
+    } catch (e) {
+        let localDados = JSON.parse(localStorage.getItem("gondola_dados")) || [];
+        dados = localDados.filter(p => p.setor === setorFiltro);
+    }
+
+    let rupturasPendentesSetor = dados.filter(p => p.statusRuptura === true && p.tratadoRuptura !== true);
 
     let linesTabela = "";
     if (rupturasPendentesSetor.length === 0) {
         linesTabela = `<tr><td colspan="3" style="padding:30px; text-align:center; color:green; font-weight:bold; font-size:14px;">🎉 Excelente! Nenhuma ruptura pendente neste setor.</td></tr>`;
     } else {
         rupturasPendentesSetor.forEach(p => {
+            let idFormatado = String(p.id).replace('.', '_');
             linesTabela += `
                 <tr style="border-bottom: 1px solid #ddd; font-size: 13px;">
-                    <td style="padding: 12px;"><strong>${p.descricao}</strong><br><small style="color:#555;">Cód: ${p.codigo}</small><br><span style="font-size:10px; color:#777;">Auditado em: ${p.dataAuditoria} por ${p.operador}</span></td>
+                    <td style="padding: 12px;"><strong>${p.descricao}</strong><br><small style="color:#555;">Cód: ${p.codigo}</small><br><span style="font-size:10px; color:#777;">Auditado em: ${p.dataAuditoria || ''} por ${p.operador || ''}</span></td>
                     <td style="padding: 12px; text-align:center; vertical-align:middle;">
-                        <select id="motivo-${String(p.id).replace('.', '_')}" style="padding: 6px; font-size:12px; width: 100%; border:1px solid #ccc; border-radius:4px;">
+                        <select id="motivo-${idFormatado}" style="padding: 6px; font-size:12px; width: 100%; border:1px solid #ccc; border-radius:4px;">
                             <option value="Não Informado">Definir motivo...</option>
                             <option value="Estoque Zerado">❌ Estoque Zerado</option>
                             <option value="Não Abastecido">⚠️ Não Abastecido</option>
@@ -1025,7 +1143,7 @@ function abrirAbaGerente(setorFiltro) {
                         </select>
                     </td>
                     <td style="padding: 12px; text-align:center; vertical-align:middle; width:70px;">
-                        <button onclick="salvarResolucaoRuptura('${setorFiltro}', '${p.id}')" style="background:#28a745; color:white; border:none; padding:8px 10px; font-size:12px; font-weight:bold; border-radius:4px; cursor:pointer;">✓ Ok</button>
+                        <button onclick="salvarResolucaoRupturaNuvem('${setorFiltro}', '${p.id}')" style="background:#28a745; color:white; border:none; padding:8px 10px; font-size:12px; font-weight:bold; border-radius:4px; cursor:pointer;">✓ Ok</button>
                     </td>
                 </tr>
             `;
@@ -1054,493 +1172,372 @@ function abrirAbaGerente(setorFiltro) {
     `;
 }
 
-function salvarResolucaoRuptura(setorOrigem, idItemString) {
-    let dados = JSON.parse(localStorage.getItem("gondola_dados")) || [];
-    let historicoTratativas = JSON.parse(localStorage.getItem("gondola_historico_tratativas")) || [];
-    
+window.salvarResolucaoRupturaNuvem = async function(setorFiltro, idItem) {
+    let idFormatado = String(idItem).replace('.', '_');
+    let selectElement = document.getElementById(`motivo-${idFormatado}`);
+    let motivoSelecionado = selectElement ? selectElement.value : "Não Informado";
+
+    if (motivoSelecionado === "Não Informado") {
+        alert("Por favor, selecione o motivo da ocorrência antes de prosseguir.");
+        return;
+    }
+
+    try {
+        await fetch(`${URL_API_GAS}?acao=tratarRuptura&id=${idItem}&motivo=${encodeURIComponent(motivoSelecionado)}`, {
+            method: 'POST'
+        });
+        alert("Ruptura tratada e salva na nuvem com sucesso!");
+    } catch (e) {
+        let dados = JSON.parse(localStorage.getItem("gondola_dados")) || [];
+        let item = dados.find(p => String(p.id) === String(idItem));
+        if (item) {
+            item.tratadoRuptura = true;
+            item.motivoRuptura = motivoSelecionado;
+            localStorage.setItem("gondola_dados", JSON.stringify(dados));
+        }
+        alert("Ruptura tratada localmente!");
+    }
+
+    abrirAbaGerente(setorFiltro);
+};
+// ==========================================
+// 13.1. FUNÇÃO DE SALVAR RESOLUÇÃO DA RUPTURA - NUVEM / GOOGLE SHEETS
+// ==========================================
+window.salvarResolucaoRuptura = async function(setorOrigem, idItemString) {
     let elMotivo = document.getElementById(`motivo-${idItemString.replace('.', '_')}`);
     let motivoSelecionado = elMotivo ? elMotivo.value : "Não Informado";
 
-    let item = dados.find(p => String(p.id) === String(idItemString));
-    
-    if (item) {
-        let dataAtual = new Date().toLocaleDateString();
-        let horaAtual = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-        item.finalizacaoGerente = motivoSelecionado;
-        item.tratadoRuptura = true; 
-        localStorage.setItem("gondola_dados", JSON.stringify(dados));
-
-        historicoTratativas.push({
-            idTratativa: Date.now(),
-            codigo: item.codigo,
-            descricao: item.descricao,
-            setor: item.setor,
-            operadorOrigem: item.operador,
-            dataAuditoria: item.dataAuditoria,
-            motivoRuptura: motivoSelecionado,
-            gerenteResponsavel: usuarioAtual || "Administrador",
-            dataTratativa: dataAtual,
-            horaTratativa: horaAtual
-        });
-        
-        localStorage.setItem("gondola_historico_tratativas", JSON.stringify(historicoTratativas));
-        alert("✅ Tratativa gravada! O item sairá da lista.");
-        
-        abrirAbaGerente(setorOrigem);
-    } else {
-        alert("Erro ao processar item.");
-    }
-}
-
-// ==========================================
-// 13.6. HISTÓRICO DE TRATATIVAS (CLICÁVEL POR DATA)
-// ==========================================
-function abrirHistoricoTratativasGerente(dataFiltro = null) {
-    let historico = JSON.parse(localStorage.getItem("gondola_historico_tratativas")) || [];
-    let hojeStr = new Date().toLocaleDateString();
-    
-    let dataAlvo = hojeStr;
-    if (dataFiltro) {
-        let partes = dataFiltro.split("-");
-        dataAlvo = `${partes[2]}/${partes[1]}/${partes[0]}`;
+    if (motivoSelecionado === "Não Informado") {
+        alert("Por favor, selecione o motivo da ocorrência antes de prosseguir.");
+        return;
     }
 
-    let container = document.querySelector(".container");
-    if (!container) return;
-
-    let historicoFiltrado = historico.filter(t => t.dataTratativa === dataAlvo);
-
-    let linhasHtml = "";
-    if (historicoFiltrado.length === 0) {
-        linhasHtml = `<p style="text-align:center; color:#777; padding:30px; background:white; border-radius:4px;">Nenhuma tratativa resolvida nesta data (${dataAlvo}).</p>`;
-    } else {
-        let historicoInvertido = [...historicoFiltrado].reverse(); 
-        historicoInvertido.forEach(t => {
-            linhasHtml += `
-                <div style="background: white; border: 1px solid #dee2e6; border-radius: 6px; padding: 12px; margin-bottom: 10px; border-left: 5px solid #28a745; text-align:left;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px; border-bottom: 1px solid #f8f9fa; padding-bottom:4px;">
-                        <span style="font-size:11px; background:#e8f4fd; color:#0056b3; padding:2px 6px; border-radius:3px; font-weight:bold;">${t.setor}</span>
-                        <span style="font-size:11px; color:#6c757d;">🛠️ Resolvido às: ${t.horaTratativa}</span>
-                    </div>
-                    <p style="margin:0 0 6px 0; font-size:13px; color:#222;"><strong>${t.descricao}</strong> <small style="color:#666;">(${t.codigo})</small></p>
-                    <div style="font-size:11px; color:#495057; background:#f8f9fa; padding:6px; border-radius:4px; display:flex; flex-direction:column; gap:2px;">
-                        <span>❌ <strong>Ruptura:</strong> ${t.motivoRuptura}</span>
-                        <span>👤 <strong>Repositores:</strong> ${t.operadorOrigem} (Auditou em ${t.dataAuditoria})</span>
-                    </div>
-                </div>
-            `;
-        });
-    }
-
-    let partesInput = dataAlvo.split("/");
-    let dataInputFormat = `${partesInput[2]}-${partesInput[1]}-${partesInput[0]}`;
-
-    container.innerHTML = `
-        <div class="topo">
-            <h1>📋 HISTÓRICO DE TRATATIVAS</h1>
-            <p>Tratativas do dia: <strong>${dataAlvo}</strong></p>
-        </div>
-        <div class="login" style="max-width: 100%; max-height: 70vh; overflow-y: auto; padding: 10px;">
-            
-            <div style="background:#e2e3e5; padding:10px; margin-bottom:15px; border-radius:4px; text-align:center;">
-                <label style="font-size:12px; font-weight:bold; color:#495057; display:block; margin-bottom:5px;">📅 CLIQUE ABAIXO PARA CONSULTAR OUTRA DATA:</label>
-                <input type="date" value="${dataInputFormat}" onchange="abrirHistoricoTratativasGerente(this.value)" style="padding:6px; font-size:14px; width:80%; max-width:200px; border:1px solid #ccc; border-radius:4px;">
-            </div>
-
-            <button onclick="exportarParaExcel('Historico_Tratativas_Geral', 'gondola_historico_tratativas')" style="width:100%; background:#6c757d; color:white; padding:8px; margin-bottom:15px; font-weight:bold;">📥 Exportar Todo o Histórico Mensal (Excel)</button>
-            ${linhasHtml}
-            <button onclick="abrirPainelAdmin()" style="background:#495057; color:white; width:100%; margin-top:15px;">⬅️ Voltar ao Painel</button>
-        </div>
-    `;
-}
-
-// ==========================================
-// 13.7. HISTÓRICO DE LEITURA DAS MISSÕES (CLICÁVEL POR DATA)
-// ==========================================
-function abrirHistoricoMissoesGerente(dataFiltro = null) {
-    let dados = JSON.parse(localStorage.getItem("gondola_dados")) || [];
-    let hojeStr = new Date().toLocaleDateString();
-    
-    let dataAlvo = hojeStr;
-    if (dataFiltro) {
-        let partes = dataFiltro.split("-");
-        dataAlvo = `${partes[2]}/${partes[1]}/${partes[0]}`;
-    }
-
-    let container = document.querySelector(".container");
-    if (!container) return;
-
-    let sessoesMapeadas = {};
-    dados.forEach(item => {
-        if (item.dataAuditoria === dataAlvo) {
-            let id = item.idSessaoMissao || (item.dataAuditoria + "_" + item.setor); 
-            if (!sessoesMapeadas[id]) {
-                sessoesMapeadas[id] = {
-                    idSessao: id,
-                    setor: item.setor,
-                    operador: item.operador || "Não Informado",
-                    data: item.dataAuditoria,
-                    hora: item.horaAuditoria || "--:--",
-                    produtos: []
-                };
-            }
-            sessoesMapeadas[id].produtos.push(item);
-        }
-    });
-
-    let listaSessoes = Object.values(sessoesMapeadas).reverse(); 
-
-    let linesHtml = "";
-    if (listaSessoes.length === 0) {
-        linesHtml = `<p style="text-align:center; color:#777; padding:20px;">Nenhuma amostragem de gôndola foi auditada em ${dataAlvo}.</p>`;
-    } else {
-        listaSessoes.forEach(s => {
-            let total = s.produtos.length;
-            let rupturas = s.produtos.filter(p => p.statusRuptura === true).length;
-            let semPreco = s.produtos.filter(p => p.precificado === false).length;
-            let conformes = total - rupturas;
-
-            linesHtml += `
-                <div onclick="verDetalhesMissao('${s.idSessao}')" style="background: white; border: 1px solid #dee2e6; border-radius: 6px; padding: 12px; margin-bottom: 10px; cursor: pointer; border-left: 5px solid #007bff; transition: 0.2s; text-align:left;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
-                        <strong style="color: #333; font-size:14px;">${s.setor}</strong>
-                        <span style="font-size:11px; color:#6c757d;">Horário: ${s.hora}</span>
-                    </div>
-                    <div style="font-size:12px; color:#495057; display:flex; justify-content:space-between;">
-                        <span>👤 Op: ${s.operador}</span>
-                        <span>🟢 ${conformes} | 🔴 Rup: ${rupturas} | 🏷️ Etq: ${semPreco}</span>
-                    </div>
-                </div>
-            `;
-        });
-    }
-
-    let partesInput = dataAlvo.split("/");
-    let dataInputFormat = `${partesInput[2]}-${partesInput[1]}-${partesInput[0]}`;
-
-    container.innerHTML = `
-        <div class="topo">
-            <h1>📊 LEITURA DE MISSÕES</h1>
-            <p>Missões do dia: <strong>${dataAlvo}</strong></p>
-        </div>
-        <div class="login" style="max-width: 100%; max-height: 70vh; overflow-y: auto; padding: 10px;">
-            
-            <div style="background:#e2e3e5; padding:10px; margin-bottom:15px; border-radius:4px; text-align:center;">
-                <label style="font-size:12px; font-weight:bold; color:#495057; display:block; margin-bottom:5px;">📅 CLIQUE ABAIXO PARA CONSULTAR OUTRA DATA:</label>
-                <input type="date" value="${dataInputFormat}" onchange="abrirHistoricoMissoesGerente(this.value)" style="padding:6px; font-size:14px; width:80%; max-width:200px; border:1px solid #ccc; border-radius:4px;">
-            </div>
-
-            <button onclick="exportarParaExcel('Historico_Geral_Missoes', 'gondola_dados')" style="width:100%; background:#6c757d; color:white; padding:8px; margin-bottom:15px; font-weight:bold;">📥 Exportar Toda a Base Histórica (Excel)</button>
-            ${linesHtml}
-            <button onclick="abrirPainelAdmin()" style="background:#495057; color:white; width:100%; margin-top:15px;">⬅️ Voltar ao Painel</button>
-        </div>
-    `;
-}
-
-function verDetalhesMissao(idSessao) {
-    let dados = JSON.parse(localStorage.getItem("gondola_dados")) || [];
-    let produtosSessao = dados.filter(p => (p.idSessaoMissao == idSessao || (p.dataAuditoria + "_" + p.setor) == idSessao));
-    if (produtosSessao.length === 0) return;
-
-    let infoBase = produtosSessao[0];
-    let container = document.querySelector(".container");
-
-    let itensHtml = "";
-    produtosSessao.forEach((p, index) => {
-        let absBadge = p.abastecido ? `<span style="color:green; font-weight:bold;">🟢 Abastecido</span>` : `<span style="color:red; font-weight:bold;">🔴 RUPTURA</span>`;
-        let prcBadge = p.precificado === true ? `| Preço: <span style="color:green;">🟢 OK</span>` : (p.precificado === false ? `| Preço: <span style="color:red; font-weight:bold;">🔴 SEM ETIQUETA</span>` : `| Preço: <span style="color:gray;">⚠️ N/A</span>`);
-        let tratativa = p.finalizacaoGerente ? `<br><span style="color:#28a745; font-size:11px;">🛠️ Solução: <strong>${p.finalizacaoGerente}</strong></span>` : "";
-
-        itensHtml += `
-            <div style="padding: 10px 0; border-bottom: 1px solid #eee; font-size: 13px;">
-                <p style="margin: 0 0 5px 0;"><strong>${index + 1}. ${p.descricao}</strong> <small style="color:#777;">(${p.codigo})</small></p>
-                <div style="background:#f8f9fa; padding:6px; border-radius:4px; font-size:12px;">
-                    ${absBadge} ${prcBadge}
-                    ${tratativa}
-                </div>
-            </div>
-        `;
-    });
-
-    container.innerHTML = `
-        <div class="topo">
-            <h1>📋 DETALHES DA MISSÃO</h1>
-            <p>${infoBase.setor}</p>
-        </div>
-        <div class="login" style="max-width: 100%; max-height: 70vh; overflow-y: auto; text-align:left; padding: 15px;">
-            <div style="background:#e9ecef; padding:8px; border-radius:4px; font-size:12px; margin-bottom:15px; color:#495057;">
-                👤 <strong>Operador:</strong> ${infoBase.operador || "Não Informado"}<br>
-                📅 <strong>Data:</strong> ${infoBase.dataAuditoria} às ${infoBase.horaAuditoria || "--:--"}<br>
-            </div>
-            ${itensHtml}
-            <button onclick="abrirHistoricoMissoesGerente()" style="background:#6c757d; color:white; width:100%; margin-top:20px;">⬅️ Voltar ao Histórico</button>
-        </div>
-    `;
-}
-
-// ==========================================
-// 13.6. HISTÓRICO DE TRATATIVAS (CLICÁVEL POR DATA)
-// ==========================================
-function abrirHistoricoTratativasGerente(dataFiltro = null) {
-    let historico = JSON.parse(localStorage.getItem("gondola_historico_tratativas")) || [];
-    let hojeStr = new Date().toLocaleDateString();
-    
-    let dataAlvo = hojeStr;
-    if (dataFiltro) {
-        let partes = dataFiltro.split("-");
-        dataAlvo = `${partes[2]}/${partes[1]}/${partes[0]}`;
-    }
-
-    let container = document.querySelector(".container");
-    if (!container) return;
-
-    let historicoFiltrado = historico.filter(t => t.dataTratativa === dataAlvo);
-
-    let linhasHtml = "";
-    if (historicoFiltrado.length === 0) {
-        linhasHtml = `<p style="text-align:center; color:#777; padding:30px; background:white; border-radius:4px;">Nenhuma tratativa resolvida nesta data (${dataAlvo}).</p>`;
-    } else {
-        let historicoInvertido = [...historicoFiltrado].reverse(); 
-        historicoInvertido.forEach(t => {
-            linhasHtml += `
-                <div style="background: white; border: 1px solid #dee2e6; border-radius: 6px; padding: 12px; margin-bottom: 10px; border-left: 5px solid #28a745; text-align:left;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px; border-bottom: 1px solid #f8f9fa; padding-bottom:4px;">
-                        <span style="font-size:11px; background:#e8f4fd; color:#0056b3; padding:2px 6px; border-radius:3px; font-weight:bold;">${t.setor}</span>
-                        <span style="font-size:11px; color:#6c757d;">🛠️ Resolvido às: ${t.horaTratativa}</span>
-                    </div>
-                    <p style="margin:0 0 6px 0; font-size:13px; color:#222;"><strong>${t.descricao}</strong> <small style="color:#666;">(${t.codigo})</small></p>
-                    <div style="font-size:11px; color:#495057; background:#f8f9fa; padding:6px; border-radius:4px; display:flex; flex-direction:column; gap:2px;">
-                        <span>❌ <strong>Ruptura:</strong> ${t.motivoRuptura}</span>
-                        <span>👤 <strong>Repositores:</strong> ${t.operadorOrigem} (Auditou em ${t.dataAuditoria})</span>
-                    </div>
-                </div>
-            `;
-        });
-    }
-
-    let partesInput = dataAlvo.split("/");
-    let dataInputFormat = `${partesInput[2]}-${partesInput[1]}-${partesInput[0]}`;
-
-    container.innerHTML = `
-        <div class="topo">
-            <h1>📋 HISTÓRICO DE TRATATIVAS</h1>
-            <p>Tratativas do dia: <strong>${dataAlvo}</strong></p>
-        </div>
-        <div class="login" style="max-width: 100%; max-height: 70vh; overflow-y: auto; padding: 10px;">
-            
-            <div style="background:#e2e3e5; padding:10px; margin-bottom:15px; border-radius:4px; text-align:center;">
-                <label style="font-size:12px; font-weight:bold; color:#495057; display:block; margin-bottom:5px;">📅 CLIQUE ABAIXO PARA CONSULTAR OUTRA DATA:</label>
-                <input type="date" value="${dataInputFormat}" onchange="abrirHistoricoTratativasGerente(this.value)" style="padding:6px; font-size:14px; width:80%; max-width:200px; border:1px solid #ccc; border-radius:4px;">
-            </div>
-
-            <button onclick="exportarParaExcel('Historico_Tratativas_Geral', 'gondola_historico_tratativas')" style="width:100%; background:#6c757d; color:white; padding:8px; margin-bottom:15px; font-weight:bold;">📥 Exportar Todo o Histórico Mensal (Excel)</button>
-            ${linhasHtml}
-            <button onclick="abrirPainelAdmin()" style="background:#495057; color:white; width:100%; margin-top:15px;">⬅️ Voltar ao Painel</button>
-        </div>
-    `;
-}
-
-// ==========================================
-// 13.7. HISTÓRICO DE LEITURA DAS MISSÕES (CLICÁVEL POR DATA)
-// ==========================================
-function abrirHistoricoMissoesGerente(dataFiltro = null) {
-    let dados = JSON.parse(localStorage.getItem("gondola_dados")) || [];
-    let hojeStr = new Date().toLocaleDateString();
-    
-    let dataAlvo = hojeStr;
-    if (dataFiltro) {
-        let partes = dataFiltro.split("-");
-        dataAlvo = `${partes[2]}/${partes[1]}/${partes[0]}`;
-    }
-
-    let container = document.querySelector(".container");
-    if (!container) return;
-
-    let sessoesMapeadas = {};
-    dados.forEach(item => {
-        if (item.dataAuditoria === dataAlvo) {
-            let id = item.idSessaoMissao || (item.dataAuditoria + "_" + item.setor); 
-            if (!sessoesMapeadas[id]) {
-                sessoesMapeadas[id] = {
-                    idSessao: id,
-                    setor: item.setor,
-                    operador: item.operador || "Não Informado",
-                    data: item.dataAuditoria,
-                    hora: item.horaAuditoria || "--:--",
-                    produtos: []
-                };
-            }
-            sessoesMapeadas[id].produtos.push(item);
-        }
-    });
-
-    let listaSessoes = Object.values(sessoesMapeadas).reverse(); 
-
-    let linesHtml = "";
-    if (listaSessoes.length === 0) {
-        linesHtml = `<p style="text-align:center; color:#777; padding:20px;">Nenhuma amostragem de gôndola foi auditada em ${dataAlvo}.</p>`;
-    } else {
-        listaSessoes.forEach(s => {
-            let total = s.produtos.length;
-            let rupturas = s.produtos.filter(p => p.statusRuptura === true).length;
-            let semPreco = s.produtos.filter(p => p.precificado === false).length;
-            let conformes = total - rupturas;
-
-            linesHtml += `
-                <div onclick="verDetalhesMissao('${s.idSessao}')" style="background: white; border: 1px solid #dee2e6; border-radius: 6px; padding: 12px; margin-bottom: 10px; cursor: pointer; border-left: 5px solid #007bff; transition: 0.2s; text-align:left;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
-                        <strong style="color: #333; font-size:14px;">${s.setor}</strong>
-                        <span style="font-size:11px; color:#6c757d;">Horário: ${s.hora}</span>
-                    </div>
-                    <div style="font-size:12px; color:#495057; display:flex; justify-content:space-between;">
-                        <span>👤 Op: ${s.operador}</span>
-                        <span>🟢 ${conformes} | 🔴 Rup: ${rupturas} | 🏷️ Etq: ${semPreco}</span>
-                    </div>
-                </div>
-            `;
-        });
-    }
-
-    let partesInput = dataAlvo.split("/");
-    let dataInputFormat = `${partesInput[2]}-${partesInput[1]}-${partesInput[0]}`;
-
-    container.innerHTML = `
-        <div class="topo">
-            <h1>📊 LEITURA DE MISSÕES</h1>
-            <p>Missões do dia: <strong>${dataAlvo}</strong></p>
-        </div>
-        <div class="login" style="max-width: 100%; max-height: 70vh; overflow-y: auto; padding: 10px;">
-            
-            <div style="background:#e2e3e5; padding:10px; margin-bottom:15px; border-radius:4px; text-align:center;">
-                <label style="font-size:12px; font-weight:bold; color:#495057; display:block; margin-bottom:5px;">📅 CLIQUE ABAIXO PARA CONSULTAR OUTRA DATA:</label>
-                <input type="date" value="${dataInputFormat}" onchange="abrirHistoricoMissoesGerente(this.value)" style="padding:6px; font-size:14px; width:80%; max-width:200px; border:1px solid #ccc; border-radius:4px;">
-            </div>
-
-            <button onclick="exportarParaExcel('Historico_Geral_Missoes', 'gondola_dados')" style="width:100%; background:#6c757d; color:white; padding:8px; margin-bottom:15px; font-weight:bold;">📥 Exportar Toda a Base Histórica (Excel)</button>
-            ${linesHtml}
-            <button onclick="abrirPainelAdmin()" style="background:#495057; color:white; width:100%; margin-top:15px;">⬅️ Voltar ao Painel</button>
-        </div>
-    `;
-}
-
-function verDetalhesMissao(idSessao) {
-    let dados = JSON.parse(localStorage.getItem("gondola_dados")) || [];
-    let produtosSessao = dados.filter(p => (p.idSessaoMissao == idSessao || (p.dataAuditoria + "_" + p.setor) == idSessao));
-    if (produtosSessao.length === 0) return;
-
-    let infoBase = produtosSessao[0];
-    let container = document.querySelector(".container");
-
-    let itensHtml = "";
-    produtosSessao.forEach((p, index) => {
-        let absBadge = p.abastecido ? `<span style="color:green; font-weight:bold;">🟢 Abastecido</span>` : `<span style="color:red; font-weight:bold;">🔴 RUPTURA</span>`;
-        let prcBadge = p.precificado === true ? `| Preço: <span style="color:green;">🟢 OK</span>` : (p.precificado === false ? `| Preço: <span style="color:red; font-weight:bold;">🔴 SEM ETIQUETA</span>` : `| Preço: <span style="color:gray;">⚠️ N/A</span>`);
-        let tratativa = p.finalizacaoGerente ? `<br><span style="color:#28a745; font-size:11px;">🛠️ Solução: <strong>${p.finalizacaoGerente}</strong></span>` : "";
-
-        itensHtml += `
-            <div style="padding: 10px 0; border-bottom: 1px solid #eee; font-size: 13px;">
-                <p style="margin: 0 0 5px 0;"><strong>${index + 1}. ${p.descricao}</strong> <small style="color:#777;">(${p.codigo})</small></p>
-                <div style="background:#f8f9fa; padding:6px; border-radius:4px; font-size:12px;">
-                    ${absBadge} ${prcBadge}
-                    ${tratativa}
-                </div>
-            </div>
-        `;
-    });
-
-    container.innerHTML = `
-        <div class="topo">
-            <h1>📋 DETALHES DA MISSÃO</h1>
-            <p>${infoBase.setor}</p>
-        </div>
-        <div class="login" style="max-width: 100%; max-height: 70vh; overflow-y: auto; text-align:left; padding: 15px;">
-            <div style="background:#e9ecef; padding:8px; border-radius:4px; font-size:12px; margin-bottom:15px; color:#495057;">
-                👤 <strong>Operador:</strong> ${infoBase.operador || "Não Informado"}<br>
-                📅 <strong>Data:</strong> ${infoBase.dataAuditoria} às ${infoBase.horaAuditoria || "--:--"}<br>
-            </div>
-            ${itensHtml}
-            <button onclick="abrirHistoricoMissoesGerente()" style="background:#6c757d; color:white; width:100%; margin-top:20px;">⬅️ Voltar ao Histórico</button>
-        </div>
-    `;
-}
-
-// ==========================================
-// 14. GERENTE: MENU EXCLUSIVO DE CHECKLISTS
-// ==========================================
-function abrirMenuChecklistsGerente() {
-    let container = document.querySelector(".container");
-    if (!container) return;
-
-    let setoresChecklist = [
-        { nome: "Área externa da loja", icone: "🏪" },
-        { nome: "Frente de caixas", icone: "🛒" },
-        { nome: "Promoção e gestão comercial", icone: "🏷️" },
-        { nome: "Recepção de mercadoria", icone: "🚚" },
-        { nome: "Depósito", icone: "📦" },
-        { nome: "Flv", icone: "🍉" },
-        { nome: "Açougue", icone: "🥩" },
-        { nome: "Frios e lacticínios", icone: "🧀" },
-        { nome: "Padaria", icone: "🍞" },
-        { nome: "Mercearia", icone: "🥫" }
-    ];
-
-    let botoesHtml = "";
-    setoresChecklist.forEach(setor => {
-        botoesHtml += `
-            <button onclick="abrirChecklistSetor('${setor.nome}')" style="background: #ffffff; color: #333; border: 1px solid #ced4da; border-left: 5px solid #6f42c1; width: 100%; margin-bottom: 8px; text-align: left; padding: 12px; font-weight: bold; border-radius: 4px; display: flex; gap: 10px; align-items: center;">
-                <span>${setor.icone}</span> ${setor.nome}
-            </button>
-        `;
-    });
-
-    container.innerHTML = `
-        <div class="topo"><h1>📋 SELECIONE A ÁREA DO CHECKLIST</h1></div>
-        <div class="login" style="text-align: left; max-width: 100%; max-height: 75vh; overflow-y: auto;">
-            <p style="font-size: 13px; color: #6c757d; margin-bottom: 15px; text-align: center;">Selecione um setor abaixo para responder o questionário.</p>
-            ${botoesHtml}
-            <button onclick="usuarioAtual === 'Administrador' ? abrirPainelAdmin() : voltarMenuPrincipal()" style="background:#6c757d; color:white; width: 100%; margin-top: 15px;">Voltar</button>
-        </div>
-    `;
-}
-
-// ==========================================
-// 15. ENGINE DE IMPRESSÃO (JsBarcode)
-// ==========================================
-window.gerarEtiquetasCodigoBarras = function(lista) {
-    if (!lista || lista.length === 0) { 
-        alert("Nenhum item para imprimir!"); 
-        return; 
-    }
-    
-    let janela = window.open('', '_blank');
-    let html = `<html><head><style>
-        body { font-family: Arial; }
-        .etiqueta { display:inline-block; width: 45%; margin: 5px; padding: 10px; border: 1px solid #000; text-align: center; }
-    </style></head><body>`;
-    
-    lista.forEach(p => {
-        html += `<div class="etiqueta"><strong>${p.descricao}</strong><br><svg id="b${p.codigo}"></svg></div>`;
-    });
-    
-    html += `<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-    <script>window.onload=()=>{
-        ${lista.map(p => `JsBarcode("#b${p.codigo}", "${p.codigo}", {width:2, height:40, fontSize:12});`).join('')}
-        window.print();
-    }</script></body></html>`;
-    
-    janela.document.write(html);
-    janela.document.close();
-};
-
-
-// ==========================================
-// 17. GRAVAÇÃO DAS RESPOSTAS DO CHECKLIST
-// ==========================================
-function salvarRespostasChecklist(nomeSetor) {
-    let historicoChecklists = JSON.parse(localStorage.getItem("gondola_historico_checklists")) || [];
     let dataAtual = new Date().toLocaleDateString();
     let horaAtual = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    let gerenteNome = typeof usuarioAtual !== 'undefined' ? usuarioAtual : "Administrador";
+
+    // Mostra feedback visual rápido de salvamento
+    document.querySelector(".container").innerHTML = `
+        <div class="topo">
+            <h1>🚨 RUPTURAS: ${setorOrigem.toUpperCase()}</h1>
+            <p>Salvando tratativa na nuvem...</p>
+        </div>
+        <div class="login" style="max-width: 100%; text-align: center; padding: 20px;">
+            <p style="color:#6c757d;">⏳ Gravando alteração na planilha...</p>
+        </div>
+    `;
+
+    try {
+        let payload = {
+            acao: "salvarTratativaRuptura",
+            idItem: idItemString,
+            motivo: motivoSelecionado,
+            gerente: gerenteNome,
+            dataTratativa: dataAtual,
+            horaTratativa: horaAtual
+        };
+
+        await fetch(URL_API_GAS, {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+
+        alert("✅ Tratativa gravada na nuvem com sucesso! O item sairá da lista.");
+    } catch (e) {
+        // Fallback local caso a rede falhe momentaneamente
+        let dados = JSON.parse(localStorage.getItem("gondola_dados")) || [];
+        let historicoTratativas = JSON.parse(localStorage.getItem("gondola_historico_tratativas")) || [];
+        let item = dados.find(p => String(p.id) === String(idItemString));
+        
+        if (item) {
+            item.finalizacaoGerente = motivoSelecionado;
+            item.tratadoRuptura = true; 
+            localStorage.setItem("gondola_dados", JSON.stringify(dados));
+
+            historicoTratativas.push({
+                idTratativa: Date.now(),
+                codigo: item.codigo,
+                descricao: item.descricao,
+                setor: item.setor,
+                operadorOrigem: item.operador,
+                dataAuditoria: item.dataAuditoria,
+                motivoRuptura: motivoSelecionado,
+                gerenteResponsavel: gerenteNome,
+                dataTratativa: dataAtual,
+                horaTratativa: horaAtual
+            });
+            localStorage.setItem("gondola_historico_tratativas", JSON.stringify(historicoTratativas));
+            alert("⚠️ Sem conexão com a nuvem. Tratativa gravada localmente!");
+        } else {
+            alert("Erro ao processar item.");
+        }
+    }
+    
+    abrirAbaGerente(setorOrigem);
+};
+// ==========================================
+// 13.6. HISTÓRICO DE TRATATIVAS (CLICÁVEL POR DATA) - NUVEM / GOOGLE SHEETS
+// ==========================================
+async function abrirHistoricoTratativasGerente(dataFiltro = null) {
+    let container = document.querySelector(".container");
+    if (!container) return;
+
+    let hojeStr = new Date().toLocaleDateString();
+    let dataAlvo = hojeStr;
+
+    if (dataFiltro) {
+        let partes = dataFiltro.split("-");
+        dataAlvo = `${partes[2]}/${partes[1]}/${partes[0]}`;
+    }
+
+    container.innerHTML = `
+        <div class="topo">
+            <h1>📋 HISTÓRICO DE TRATATIVAS</h1>
+            <p>Carregando histórico da nuvem...</p>
+        </div>
+        <div class="login" style="max-width: 100%; text-align: center; padding: 20px;">
+            <p style="color:#6c757d;">⏳ Sincronizando tratativas...</p>
+        </div>
+    `;
+
+    let historico = [];
+    try {
+        let resposta = await fetch(`${URL_API_GAS}?acao=listarHistoricoTratativas`);
+        let resultado = await resposta.json();
+        if (resultado && resultado.historico) {
+            historico = resultado.historico;
+        }
+    } catch (e) {
+        historico = JSON.parse(localStorage.getItem("gondola_historico_tratativas")) || [];
+    }
+
+    let historicoFiltrado = historico.filter(t => t.dataTratativa === dataAlvo);
+
+    let linhasHtml = "";
+    if (historicoFiltrado.length === 0) {
+        linhasHtml = `<p style="text-align:center; color:#777; padding:30px; background:white; border-radius:4px;">Nenhuma tratativa resolvida nesta data (${dataAlvo}).</p>`;
+    } else {
+        let historicoInvertido = [...historicoFiltrado].reverse(); 
+        historicoInvertido.forEach(t => {
+            linhasHtml += `
+                <div style="background: white; border: 1px solid #dee2e6; border-radius: 6px; padding: 12px; margin-bottom: 10px; border-left: 5px solid #28a745; text-align:left;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px; border-bottom: 1px solid #f8f9fa; padding-bottom:4px;">
+                        <span style="font-size:11px; background:#e8f4fd; color:#0056b3; padding:2px 6px; border-radius:3px; font-weight:bold;">${t.setor}</span>
+                        <span style="font-size:11px; color:#6c757d;">🛠️ Resolvido às: ${t.horaTratativa}</span>
+                    </div>
+                    <p style="margin:0 0 6px 0; font-size:13px; color:#222;"><strong>${t.descricao}</strong> <small style="color:#666;">(${t.codigo})</small></p>
+                    <div style="font-size:11px; color:#495057; background:#f8f9fa; padding:6px; border-radius:4px; display:flex; flex-direction:column; gap:2px;">
+                        <span>❌ <strong>Ruptura:</strong> ${t.motivoRuptura}</span>
+                        <span>👤 <strong>Repositores:</strong> ${t.operadorOrigem} (Auditou em ${t.dataAuditoria})</span>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    let partesInput = dataAlvo.split("/");
+    let dataInputFormat = `${partesInput[2]}-${partesInput[1]}-${partesInput[0]}`;
+
+    container.innerHTML = `
+        <div class="topo">
+            <h1>📋 HISTÓRICO DE TRATATIVAS</h1>
+            <p>Tratativas do dia: <strong>${dataAlvo}</strong></p>
+        </div>
+        <div class="login" style="max-width: 100%; max-height: 70vh; overflow-y: auto; padding: 10px;">
+            
+            <div style="background:#e2e3e5; padding:10px; margin-bottom:15px; border-radius:4px; text-align:center;">
+                <label style="font-size:12px; font-weight:bold; color:#495057; display:block; margin-bottom:5px;">📅 CLIQUE ABAIXO PARA CONSULTAR OUTRA DATA:</label>
+                <input type="date" value="${dataInputFormat}" onchange="abrirHistoricoTratativasGerente(this.value)" style="padding:6px; font-size:14px; width:80%; max-width:200px; border:1px solid #ccc; border-radius:4px;">
+            </div>
+
+            <button onclick="exportarParaExcel('Historico_Tratativas_Geral', 'gondola_historico_tratativas')" style="width:100%; background:#6c757d; color:white; padding:8px; margin-bottom:15px; font-weight:bold;">📥 Exportar Todo o Histórico Mensal (Excel)</button>
+            ${linhasHtml}
+            <button onclick="abrirPainelAdmin()" style="background:#495057; color:white; width:100%; margin-top:15px;">⬅️ Voltar ao Painel</button>
+        </div>
+    `;
+}
+
+// ==========================================
+// 13.7. HISTÓRICO DE LEITURA DAS MISSÕES (CLICÁVEL POR DATA) - NUVEM / GOOGLE SHEETS
+// ==========================================
+async function abrirHistoricoMissoesGerente(dataFiltro = null) {
+    let container = document.querySelector(".container");
+    if (!container) return;
+
+    let hojeStr = new Date().toLocaleDateString();
+    let dataAlvo = hojeStr;
+
+    if (dataFiltro) {
+        let partes = dataFiltro.split("-");
+        dataAlvo = `${partes[2]}/${partes[1]}/${partes[0]}`;
+    }
+
+    container.innerHTML = `
+        <div class="topo">
+            <h1>📊 LEITURA DE MISSÕES</h1>
+            <p>Carregando histórico da nuvem...</p>
+        </div>
+        <div class="login" style="max-width: 100%; text-align: center; padding: 20px;">
+            <p style="color:#6c757d;">⏳ Sincronizando missões...</p>
+        </div>
+    `;
+
+    let dados = [];
+    try {
+        let resposta = await fetch(`${URL_API_GAS}?acao=listarMissoes`);
+        let resultado = await resposta.json();
+        if (resultado && resultado.dados) {
+            dados = resultado.dados;
+        }
+    } catch (e) {
+        dados = JSON.parse(localStorage.getItem("gondola_dados")) || [];
+    }
+
+    let sessoesMapeadas = {};
+    dados.forEach(item => {
+        if (item.dataAuditoria === dataAlvo) {
+            let id = item.idSessaoMissao || (item.dataAuditoria + "_" + item.setor); 
+            if (!sessoesMapeadas[id]) {
+                sessoesMapeadas[id] = {
+                    idSessao: id,
+                    setor: item.setor,
+                    operador: item.operador || "Não Informado",
+                    data: item.dataAuditoria,
+                    hora: item.horaAuditoria || "--:--",
+                    produtos: []
+                };
+            }
+            sessoesMapeadas[id].produtos.push(item);
+        }
+    });
+
+    let listaSessoes = Object.values(sessoesMapeadas).reverse(); 
+
+    let linesHtml = "";
+    if (listaSessoes.length === 0) {
+        linesHtml = `<p style="text-align:center; color:#777; padding:20px;">Nenhuma amostragem de gôndola foi auditada em ${dataAlvo}.</p>`;
+    } else {
+        listaSessoes.forEach(s => {
+            let total = s.produtos.length;
+            let rupturas = s.produtos.filter(p => p.statusRuptura === true).length;
+            let semPreco = s.produtos.filter(p => p.precificado === false).length;
+            let conformes = total - rupturas;
+
+            linesHtml += `
+                <div onclick="verDetalhesMissao('${s.idSessao}')" style="background: white; border: 1px solid #dee2e6; border-radius: 6px; padding: 12px; margin-bottom: 10px; cursor: pointer; border-left: 5px solid #007bff; transition: 0.2s; text-align:left;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
+                        <strong style="color: #333; font-size:14px;">${s.setor}</strong>
+                        <span style="font-size:11px; color:#6c757d;">Horário: ${s.hora}</span>
+                    </div>
+                    <div style="font-size:12px; color:#495057; display:flex; justify-content:space-between;">
+                        <span>👤 Op: ${s.operador}</span>
+                        <span>🟢 ${conformes} | 🔴 Rup: ${rupturas} | 🏷️ Etq: ${semPreco}</span>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    let partesInput = dataAlvo.split("/");
+    let dataInputFormat = `${partesInput[2]}-${partesInput[1]}-${partesInput[0]}`;
+
+    container.innerHTML = `
+        <div class="topo">
+            <h1>📊 LEITURA DE MISSÕES</h1>
+            <p>Missões do dia: <strong>${dataAlvo}</strong></p>
+        </div>
+        <div class="login" style="max-width: 100%; max-height: 70vh; overflow-y: auto; padding: 10px;">
+            
+            <div style="background:#e2e3e5; padding:10px; margin-bottom:15px; border-radius:4px; text-align:center;">
+                <label style="font-size:12px; font-weight:bold; color:#495057; display:block; margin-bottom:5px;">📅 CLIQUE ABAIXO PARA CONSULTAR OUTRA DATA:</label>
+                <input type="date" value="${dataInputFormat}" onchange="abrirHistoricoMissoesGerente(this.value)" style="padding:6px; font-size:14px; width:80%; max-width:200px; border:1px solid #ccc; border-radius:4px;">
+            </div>
+
+            <button onclick="exportarParaExcel('Historico_Geral_Missoes', 'gondola_dados')" style="width:100%; background:#6c757d; color:white; padding:8px; margin-bottom:15px; font-weight:bold;">📥 Exportar Toda a Base Histórica (Excel)</button>
+            ${linesHtml}
+            <button onclick="abrirPainelAdmin()" style="background:#495057; color:white; width:100%; margin-top:15px;">⬅️ Voltar ao Painel</button>
+        </div>
+    `;
+}
+
+// ==========================================
+// 13.8. DETALHES DA MISSÃO - NUVEM / GOOGLE SHEETS
+// ==========================================
+window.verDetalhesMissao = async function(idSessao) {
+    let container = document.querySelector(".container");
+    if (!container) return;
+
+    container.innerHTML = `
+        <div class="topo">
+            <h1>📋 DETALHES DA MISSÃO</h1>
+            <p>Carregando detalhes da nuvem...</p>
+        </div>
+        <div class="login" style="max-width: 100%; text-align: center; padding: 20px;">
+            <p style="color:#6c757d;">⏳ Buscando dados da missão...</p>
+        </div>
+    `;
+
+    let dados = [];
+    try {
+        let resposta = await fetch(`${URL_API_GAS}?acao=listarMissoes`);
+        let resultado = await resposta.json();
+        if (resultado && resultado.dados) {
+            dados = resultado.dados;
+        }
+    } catch (e) {
+        dados = JSON.parse(localStorage.getItem("gondola_dados")) || [];
+    }
+
+    let produtosSessao = dados.filter(p => (p.idSessaoMissao == idSessao || (p.dataAuditoria + "_" + p.setor) == idSessao));
+    
+    if (produtosSessao.length === 0) {
+        alert("Nenhum produto encontrado para esta sessão.");
+        abrirHistoricoMissoesGerente();
+        return;
+    }
+
+    let infoBase = produtosSessao[0];
+    let itensHtml = "";
+
+    produtosSessao.forEach((p, index) => {
+        let absBadge = p.abastecido ? `<span style="color:green; font-weight:bold;">🟢 Abastecido</span>` : `<span style="color:red; font-weight:bold;">🔴 RUPTURA</span>`;
+        let prcBadge = p.precificado === true ? `| Preço: <span style="color:green;">🟢 OK</span>` : (p.precificado === false ? `| Preço: <span style="color:red; font-weight:bold;">🔴 SEM ETIQUETA</span>` : `| Preço: <span style="color:gray;">⚠️ N/A</span>`);
+        let tratativa = p.finalizacaoGerente ? `<br><span style="color:#28a745; font-size:11px;">🛠️ Solução: <strong>${p.finalizacaoGerente}</strong></span>` : "";
+
+        itensHtml += `
+            <div style="padding: 10px 0; border-bottom: 1px solid #eee; font-size: 13px;">
+                <p style="margin: 0 0 5px 0;"><strong>${index + 1}. ${p.descricao}</strong> <small style="color:#777;">(${p.codigo})</small></p>
+                <div style="background:#f8f9fa; padding:6px; border-radius:4px; font-size:12px;">
+                    ${absBadge} ${prcBadge}
+                    ${tratativa}
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = `
+        <div class="topo">
+            <h1>📋 DETALHES DA MISSÃO</h1>
+            <p>${infoBase.setor}</p>
+        </div>
+        <div class="login" style="max-width: 100%; max-height: 70vh; overflow-y: auto; text-align:left; padding: 15px;">
+            <div style="background:#e9ecef; padding:8px; border-radius:4px; font-size:12px; margin-bottom:15px; color:#495057;">
+                👤 <strong>Operador:</strong> ${infoBase.operador || "Não Informado"}<br>
+                📅 <strong>Data:</strong> ${infoBase.dataAuditoria} às ${infoBase.horaAuditoria || "--:--"}<br>
+            </div>
+            ${itensHtml}
+            <button onclick="abrirHistoricoMissoesGerente()" style="background:#6c757d; color:white; width:100%; margin-top:20px;">⬅️ Voltar ao Histórico</button>
+        </div>
+    `;
+};
+// ==========================================
+// 17. GRAVAÇÃO DAS RESPOSTAS DO CHECKLIST - NUVEM / GOOGLE SHEETS
+// ==========================================
+async function salvarRespostasChecklist(nomeSetor) {
+    let dataAtual = new Date().toLocaleDateString();
+    let horaAtual = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    let usuarioLogado = typeof usuarioAtual !== 'undefined' ? usuarioAtual : "Administrador";
+    let sessaoId = Date.now();
 
     let novasRespostas = [];
     if (typeof perguntasAtivasChecklist !== 'undefined') {
@@ -1563,25 +1560,48 @@ function salvarRespostasChecklist(nomeSetor) {
         return;
     }
 
-    historicoChecklists.push({
-        idSessao: Date.now(),
+    let payloadChecklist = {
+        idSessao: sessaoId,
         setor: nomeSetor,
-        usuario: typeof usuarioAtual !== 'undefined' ? usuarioAtual : "Administrador",
+        usuario: usuarioLogado,
         data: dataAtual,
         hora: horaAtual,
         itensRespondidos: novasRespostas
-    });
+    };
 
+    // Salva localmente como backup/fallback imediato
+    let historicoChecklists = JSON.parse(localStorage.getItem("gondola_historico_checklists")) || [];
+    historicoChecklists.push(payloadChecklist);
     localStorage.setItem("gondola_historico_checklists", JSON.stringify(historicoChecklists));
+
+    // Envio para a nuvem (Google Sheets via Apps Script)
+    try {
+        if (typeof URL_API_GAS !== 'undefined' && URL_API_GAS) {
+            await fetch(URL_API_GAS, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    acao: "salvarChecklist",
+                    ...payloadChecklist
+                })
+            });
+        }
+    } catch (e) {
+        console.warn("Erro ao sincronizar checklist com a nuvem, salvo apenas localmente.", e);
+    }
+
     alert(`✅ Checklist do setor "${nomeSetor}" gravado com sucesso!`);
     abrirMenuChecklistsGerente();
 }
 
 // ==========================================
-// 18. HISTÓRICO DE CHECKLISTS
+// 18. HISTÓRICO DE CHECKLISTS - NUVEM / GOOGLE SHEETS
 // ==========================================
-function abrirHistoricoChecklistsGerente(dataFiltro = null) {
-    let historico = JSON.parse(localStorage.getItem("gondola_historico_checklists")) || [];
+async function abrirHistoricoChecklistsGerente(dataFiltro = null) {
+    let container = document.querySelector(".container");
+    if (!container) return;
+
     let dataSelecionada = new Date().toLocaleDateString();
 
     if (dataFiltro) {
@@ -1589,64 +1609,136 @@ function abrirHistoricoChecklistsGerente(dataFiltro = null) {
         dataSelecionada = `${p[2]}/${p[1]}/${p[0]}`;
     }
 
-    let lista = historico.filter(item => item.data === dataSelecionada).sort((a,b)=>b.idSessao-a.idSessao);
-    let html = lista.length === 0 ? '<div style="padding:25px;text-align:center;color:#666;">Nenhum checklist encontrado nesta data.</div>' : "";
+    container.innerHTML = `
+        <div class="topo"><h1>📋 HISTÓRICO DE CHECKLISTS</h1></div>
+        <div class="login" style="max-width: 100%; text-align: center; padding: 20px;">
+            <p style="color:#6c757d;">⏳ Sincronizando histórico da nuvem...</p>
+        </div>
+    `;
+
+    let historico = [];
+    try {
+        if (typeof URL_API_GAS !== 'undefined' && URL_API_GAS) {
+            let resposta = await fetch(`${URL_API_GAS}?acao=listarHistoricoChecklists`);
+            let resultado = await resposta.json();
+            if (resultado && resultado.historico) {
+                historico = resultado.historico;
+            }
+        } else {
+            throw new Error("URL_API_GAS não configurada");
+        }
+    } catch (e) {
+        historico = JSON.parse(localStorage.getItem("gondola_historico_checklists")) || [];
+    }
+
+    let lista = historico.filter(item => item.data === dataSelecionada).sort((a,b) => b.idSessao - a.idSessao);
+    let html = lista.length === 0 ? '<div style="padding:25px; text-align:center; color:#666; background:white; border-radius:4px; margin-bottom:15px;">Nenhum checklist encontrado nesta data.</div>' : "";
 
     lista.forEach(sessao => {
         let itens = sessao.itensRespondidos || [];
-        let ok = itens.filter(i=>i.resposta==="OK").length;
-        let nc = itens.filter(i=>i.resposta==="NAO_CONFORME").length;
+        let ok = itens.filter(i => i.resposta === "OK").length;
+        let nc = itens.filter(i => i.resposta === "NAO_CONFORME" || i.resposta === "NÃO CONFORME").length;
         
         html += `
-            <div onclick="verDetalhesChecklist('${sessao.idSessao}')" style="background:white;border-left:5px solid #6f42c1;padding:12px;margin-bottom:10px;border-radius:6px;cursor:pointer;">
-                <strong>${sessao.setor}</strong><br>
-                <small>👤 ${sessao.usuario} | 🕒 ${sessao.hora}</small>
-                <hr>
-                🟢 ${ok} &nbsp;&nbsp; 🔴 ${nc} &nbsp;&nbsp; 📋 ${itens.length}
+            <div onclick="verDetalhesChecklist('${sessao.idSessao}')" style="background:white; border-left:5px solid #6f42c1; padding:12px; margin-bottom:10px; border-radius:6px; cursor:pointer; text-align:left; border:1px solid #dee2e6; border-left-width:5px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <strong style="color:#333; font-size:14px;">${sessao.setor}</strong>
+                    <small style="color:#6c757d;">🕒 ${sessao.hora || "--:--"}</small>
+                </div>
+                <small style="color:#495057; display:block; margin-top:2px;">👤 Responsável: ${sessao.usuario}</small>
+                <hr style="margin:8px 0; border:0; border-top:1px solid #f1f1f1;">
+                <div style="font-size:12px; font-weight:bold;">
+                    🟢 OK: ${ok} &nbsp;&nbsp; 🔴 Não Conforme: ${nc} &nbsp;&nbsp; 📋 Total: ${itens.length}
+                </div>
             </div>
         `;
     });
 
     let d = dataSelecionada.split("/");
-    document.querySelector(".container").innerHTML = `
-        <div class="topo"><h1>📋 HISTÓRICO</h1></div>
-        <div class="login">
-            <input type="date" value="${d[2]}-${d[1]}-${d[0]}" onchange="abrirHistoricoChecklistsGerente(this.value)">
-            <button onclick="exportarParaExcel('Historico_Checklists','gondola_historico_checklists')">📥 Exportar Excel</button>
+    let inputDateVal = `${d[2]}-${d[1]}-${d[0]}`;
+
+    container.innerHTML = `
+        <div class="topo"><h1>📋 HISTÓRICO DE CHECKLISTS</h1></div>
+        <div class="login" style="max-width: 100%; max-height: 75vh; overflow-y: auto; padding: 10px;">
+            <div style="background:#e2e3e5; padding:10px; margin-bottom:15px; border-radius:4px; text-align:center;">
+                <label style="font-size:12px; font-weight:bold; color:#495057; display:block; margin-bottom:5px;">📅 SELECIONE A DATA DE CONSULTA:</label>
+                <input type="date" value="${inputDateVal}" onchange="abrirHistoricoChecklistsGerente(this.value)" style="padding:6px; font-size:14px; width:80%; max-width:200px; border:1px solid #ccc; border-radius:4px;">
+            </div>
+            <button onclick="exportarParaExcel('Historico_Checklists','gondola_historico_checklists')" style="width:100%; background:#6c757d; color:white; padding:8px; margin-bottom:15px; font-weight:bold;">📥 Exportar Excel</button>
             ${html}
-            <button onclick="abrirPainelAdmin()">⬅️ Voltar</button>
+            <button onclick="typeof usuarioAtual !== 'undefined' && usuarioAtual === 'Administrador' ? abrirPainelAdmin() : voltarMenuPrincipal()" style="background:#495057; color:white; width:100%; margin-top:15px;">⬅️ Voltar</button>
         </div>
     `;
 }
 
 // ==========================================
-// 19. DETALHES DO CHECKLIST
+// 19. DETALHES DO CHECKLIST - NUVEM / GOOGLE SHEETS
 // ==========================================
-function verDetalhesChecklist(idSessao){
-    let historico = JSON.parse(localStorage.getItem("gondola_historico_checklists")) || [];
+window.verDetalhesChecklist = async function(idSessao) {
+    let container = document.querySelector(".container");
+    if (!container) return;
+
+    container.innerHTML = `
+        <div class="topo"><h1>📋 DETALHES DO CHECKLIST</h1></div>
+        <div class="login" style="max-width: 100%; text-align: center; padding: 20px;">
+            <p style="color:#6c757d;">⏳ Buscando dados do checklist...</p>
+        </div>
+    `;
+
+    let historico = [];
+    try {
+        if (typeof URL_API_GAS !== 'undefined' && URL_API_GAS) {
+            let resposta = await fetch(`${URL_API_GAS}?acao=listarHistoricoChecklists`);
+            let resultado = await resposta.json();
+            if (resultado && resultado.historico) {
+                historico = resultado.historico;
+            }
+        } else {
+            throw new Error("URL_API_GAS não configurada");
+        }
+    } catch (e) {
+        historico = JSON.parse(localStorage.getItem("gondola_historico_checklists")) || [];
+    }
+
     let sessao = historico.find(s => String(s.idSessao) === String(idSessao));
-    if(!sessao) return;
+    if (!sessao) {
+        alert("Checklist não encontrado.");
+        abrirHistoricoChecklistsGerente();
+        return;
+    }
 
-    let html = sessao.itensRespondidos.map((item, index) => `
-        <div style="padding:10px;border-bottom:1px solid #ddd;">
-            <strong>${index+1}. ${item.perguntaTexto}</strong><br>
-            <strong>${item.resposta === "OK" ? "🟢 OK" : "🔴 NÃO CONFORME"}</strong>
-            ${item.observacao ? `<br><small>💬 ${item.observacao}</small>` : ""}
-        </div>
-    `).join("");
+    let itensHtml = (sessao.itensRespondidos || []).map((item, index) => {
+        let isOk = item.resposta === "OK";
+        let statusBadge = isOk 
+            ? `<span style="color:#28a745; font-weight:bold;">🟢 OK</span>` 
+            : `<span style="color:#dc3545; font-weight:bold;">🔴 NÃO CONFORME</span>`;
 
-    document.querySelector(".container").innerHTML = `
+        return `
+            <div style="padding:10px; border-bottom:1px solid #eee; text-align:left; font-size:13px;">
+                <p style="margin:0 0 5px 0;"><strong>${index + 1}. ${item.perguntaTexto}</strong></p>
+                <div style="background:#f8f9fa; padding:6px; border-radius:4px; font-size:12px;">
+                    Status: ${statusBadge}
+                    ${item.observacao ? `<br><span style="color:#555;">💬 <strong>Obs:</strong> ${item.observacao}</span>` : ""}
+                </div>
+            </div>
+        `;
+    }).join("");
+
+    container.innerHTML = `
         <div class="topo"><h1>${sessao.setor}</h1></div>
-        <div class="login">
-            <p><strong>Responsável:</strong> ${sessao.usuario} | <strong>Data:</strong> ${sessao.data}</p>
-            <hr>${html}
-            <button onclick="abrirHistoricoChecklistsGerente()">⬅️ Voltar</button>
+        <div class="login" style="max-width: 100%; max-height: 75vh; overflow-y: auto; padding: 15px;">
+            <div style="background:#e9ecef; padding:8px; border-radius:4px; font-size:12px; margin-bottom:15px; text-align:left; color:#495057;">
+                👤 <strong>Responsável:</strong> ${sessao.usuario}<br>
+                📅 <strong>Data:</strong> ${sessao.data} às ${sessao.hora || "--:--"}
+            </div>
+            ${itensHtml}
+            <button onclick="abrirHistoricoChecklistsGerente()" style="background:#6c757d; color:white; width:100%; margin-top:20px;">⬅️ Voltar ao Histórico</button>
         </div>
     `;
-}
+};
 
 // ==========================================================
-// FUNÇÃO ACIONADA PELO BOTÃO DA TELA DE GESTÃO (CICLO EVOLUTIVO DE 6 DIAS)
+// FUNÇÃO ACIONADA PELO BOTÃO DA TELA DE GESTÃO (CICLO EVOLUTIVO DE 6 DIAS) - NUVEM / GOOGLE SHEETS
 // ==========================================================
 let indiceMissaoAtual = 0;
 let perguntasMissao = [];
@@ -1765,7 +1857,7 @@ function renderizarPerguntaDoChecklist() {
             <button onclick="salvarRespostaPasso('SIM')" style="width:100%;padding:16px;background:#28a745;color:white;border:none;border-radius:6px;margin-bottom:12px;font-size:16px;font-weight:bold;cursor:pointer;">
                 🟢 SIM (CONFORME)
             </button>
-            <button onclick="salvarRespostaPasso('NÃO')" style="width:100%;padding:16px;background:#dc3545;color:white;border:none;border-radius:6px;font-size:16px;font-weight:bold;cursor:pointer;">
+            <button onclick="salvarRespostaPasso('NÃO')" style="width:100%;padding:16px;background:#dc3545;color:white;border:none;border-radius:6px;margin-bottom:12px;font-size:16px;font-weight:bold;cursor:pointer;">
                 🔴 NÃO CONFORME
             </button>
             <button onclick="location.reload()" style="width:100%;padding:12px;background:#6c757d;color:white;border:none;border-radius:6px;font-size:14px;margin-top:15px;cursor:pointer;">
@@ -1775,7 +1867,7 @@ function renderizarPerguntaDoChecklist() {
     `;
 }
 
-function salvarRespostaPasso(resposta) {
+async function salvarRespostaPasso(resposta) {
     let perguntaAtual = perguntasMissao[indiceMissaoAtual];
     let respostas = JSON.parse(localStorage.getItem("gondola_respostas_checklist_atual")) || [];
 
@@ -1801,9 +1893,10 @@ function salvarRespostaPasso(resposta) {
     let percentual = Math.round((conformes / itensRespondidos.length) * 100);
 
     let diaDoCiclo = parseInt(localStorage.getItem("gondola_ciclo_checklist_dia")) || 1;
+    let sessaoId = Date.now();
 
     let novoChecklist = {
-        idSessao: Date.now(),
+        idSessao: sessaoId,
         setor: "Checklist Operacional",
         tipoMissao: diaDoCiclo === 5 ? "GLOBAL" : "ROTINA", // Separação para os gráficos
         usuario: (typeof usuarioAtual !== "undefined" && usuarioAtual) ? usuarioAtual : "Administrador",
@@ -1819,6 +1912,23 @@ function salvarRespostaPasso(resposta) {
     localStorage.setItem("gondola_historico_checklists", JSON.stringify(historico));
     localStorage.removeItem("gondola_respostas_checklist_atual");
 
+    // Envio para a nuvem (Google Sheets via Apps Script)
+    try {
+        if (typeof URL_API_GAS !== 'undefined' && URL_API_GAS) {
+            await fetch(URL_API_GAS, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    acao: "salvarChecklist",
+                    ...novoChecklist
+                })
+            });
+        }
+    } catch (e) {
+        console.warn("Erro ao sincronizar checklist operacional com a nuvem, salvo apenas localmente.", e);
+    }
+
     // Avança para o próximo dia (no caso, vai para o Dia 6 - Dia da Gestão)
     localStorage.setItem("gondola_ciclo_checklist_dia", diaDoCiclo + 1);
 
@@ -1827,11 +1937,12 @@ function salvarRespostaPasso(resposta) {
 }
 
 // --- CONCLUSÃO AUTOMÁTICA DO DIA DA GESTÃO ---
-function salvarDiaDaGestaoNoHist() {
+async function salvarDiaDaGestaoNoHist() {
     let historico = JSON.parse(localStorage.getItem("gondola_historico_checklists")) || [];
+    let sessaoId = Date.now();
 
     let analiseGestao = {
-        idSessao: Date.now(),
+        idSessao: sessaoId,
         setor: "Checklist Operacional",
         tipoMissao: "DIA_GESTAO", // Tag estratégica
         usuario: (typeof usuarioAtual !== "undefined" && usuarioAtual) ? usuarioAtual : "Administrador",
@@ -1851,6 +1962,23 @@ function salvarDiaDaGestaoNoHist() {
     historico.push(analiseGestao);
     localStorage.setItem("gondola_historico_checklists", JSON.stringify(historico));
 
+    // Envio para a nuvem (Google Sheets via Apps Script)
+    try {
+        if (typeof URL_API_GAS !== 'undefined' && URL_API_GAS) {
+            await fetch(URL_API_GAS, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    acao: "salvarChecklist",
+                    ...analiseGestao
+                })
+            });
+        }
+    } catch (e) {
+        console.warn("Erro ao sincronizar dia da gestão com a nuvem, salvo apenas localmente.", e);
+    }
+
     // Finalizou o 6º dia, reseta o ciclo completo de volta para o Dia 1
     localStorage.setItem("gondola_ciclo_checklist_dia", 1);
 
@@ -1858,8 +1986,7 @@ function salvarDiaDaGestaoNoHist() {
     abrirPainelAdmin();
 }
 // ==========================================================
-// SERVIÇO: COLETOR DE ETIQUETAS AVULSO
-// CORRIGIDO - GRAVA NOME DO PRODUTO
+// SERVIÇO: COLETOR DE ETIQUETAS AVULSO + NUVEM (GOOGLE SHEETS)
 // ==========================================================
 
 let scannerColetorAtivo = null;
@@ -2146,7 +2273,7 @@ function buscarProdutoNaBaseGlobal(){
 
 
 
-function confirmarEGravarEtiquetaPendente(){
+async function confirmarEGravarEtiquetaPendente(){
 
 
     if(!produtoColetorSelecionado){
@@ -2203,6 +2330,23 @@ function confirmarEGravarEtiquetaPendente(){
         JSON.stringify(lista)
     );
 
+    // Sincronização em nuvem (Google Sheets)
+    try {
+        if (typeof URL_API_GAS !== 'undefined' && URL_API_GAS) {
+            await fetch(URL_API_GAS, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    acao: "salvarEtiquetaPendente",
+                    ...novaEtiqueta
+                })
+            });
+        }
+    } catch (e) {
+        console.warn("Erro ao sincronizar etiqueta com a nuvem, salva localmente.", e);
+    }
+
 
 
     alert(
@@ -2242,34 +2386,28 @@ function confirmarEGravarEtiquetaPendente(){
 }
 
 // ==========================================================
-// SUBSTITUIR APENAS ESTE BLOCO NO SEU SCRIPT
+// IMPORTAÇÃO DE RUAS E ROTAS (CSV LOCAL + NUVEM)
 // ==========================================================
 function processarArquivoCSVRotas(elementoInput) {
     let arquivo = elementoInput.files[0];
     if (!arquivo) return;
 
     let leitor = new FileReader();
-    leitor.onload = function(e) {
+    leitor.onload = async function(e) {
         try {
             let texto = e.target.result;
-            // Quebra as linhas do arquivo
             let linhas = texto.split("\n");
             let resultado = [];
 
-            // Pula a primeira linha do cabeçalho (i = 1)
             for (let i = 1; i < linhas.length; i++) {
                 let linhaLimpa = linhas[i].trim();
                 if (!linhaLimpa) continue;
 
-                // Corta no ponto e vírgula direto, igual nas missões
                 let colunas = linhaLimpa.split(";");
-
                 let nomeRua = colunas[2] ? colunas[2].trim().toUpperCase() : "";
                 
-                // Se a linha for fantasma ou vazia no Excel, ignora e pula
                 if (nomeRua === "" || nomeRua === "NOME") continue;
 
-                // Salva na ordem exata das colunas: A (0), B (1), C (2), D (3)
                 resultado.push({
                     CIDADE: colunas[0] ? colunas[0].trim().toUpperCase() : "",
                     BAIRRO: colunas[1] ? colunas[1].trim().toUpperCase() : "",
@@ -2278,9 +2416,26 @@ function processarArquivoCSVRotas(elementoInput) {
                 });
             }
 
-            // Grava o banco limpo que os seus botões atuais consultam
             localStorage.setItem("base_ruas_entrega", JSON.stringify(resultado));
-            alert("✅ Planilha base integrada! " + resultado.length + " ruas prontas.");
+
+            // Sincroniza a base de ruas com a nuvem para manter todos os caixas atualizados
+            try {
+                if (typeof URL_API_GAS !== 'undefined' && URL_API_GAS) {
+                    await fetch(URL_API_GAS, {
+                        method: "POST",
+                        mode: "no-cors",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            acao: "sincronizarBaseRuas",
+                            ruas: resultado
+                        })
+                    });
+                }
+            } catch (netErr) {
+                console.warn("Aviso: Base de ruas gravada localmente, falha na sincronização via nuvem.", netErr);
+            }
+
+            alert("✅ Planilha base integrada e sincronizada! " + resultado.length + " ruas prontas.");
             
             if (typeof abrirPainelAdmin === "function") abrirPainelAdmin();
 
@@ -2292,17 +2447,34 @@ function processarArquivoCSVRotas(elementoInput) {
     leitor.readAsText(arquivo, "UTF-8");
 }
 
-// --- Variables de Controle do Fluxo em Cascata ---
+// --- Variáveis de Controle do Fluxo em Cascata ---
 let entregaEmEdicao = {
     cliente: "", cidade: "", bairro: "", rua: "", numero: "", apartamento: "Não", aptoDetalhe: "", caixas: 1, gelados: "Não"
 };
 
+// --- FUNÇÃO PARA CARREGAR RUAS DA NUVEM SE NECESSÁRIO ---
+async function carregarBaseRuasDaNuvem() {
+    try {
+        if (typeof URL_API_GAS !== 'undefined' && URL_API_GAS) {
+            let resposta = await fetch(`${URL_API_GAS}?acao=obterBaseRuas`);
+            let dadosNuvem = await resposta.json();
+            if (dadosNuvem && Array.isArray(dadosNuvem) && dadosNuvem.length > 0) {
+                localStorage.setItem("base_ruas_entrega", JSON.stringify(dadosNuvem));
+            }
+        }
+    } catch (e) {
+        console.warn("Usando base de ruas local (offline ou sem retorno da nuvem).", e);
+    }
+}
+
 // --- 2. TELA PRINCIPAL DO FISCAL DE CAIXA (LANÇAMENTO) ---
-function abrirAbaLancamentoEntrega() {
+async function abrirAbaLancamentoEntrega() {
     let container = document.querySelector(".container");
     if (!container) return;
 
-    // Reset do objeto temporário
+    // Atualiza base de ruas da nuvem em segundo plano ao abrir a tela
+    await carregarBaseRuasDaNuvem();
+
     entregaEmEdicao = { cliente: "", cidade: "", bairro: "", rua: "", numero: "", apartamento: "Não", aptoDetalhe: "", caixas: 1, gelados: "Não" };
 
     container.innerHTML = `
@@ -2366,7 +2538,7 @@ function abrirAbaLancamentoEntrega() {
     `;
 }
 
-// --- 3. INTELIGÊNCIA DO CADASTRO AUTOMÁTICO (BUM!) ---
+// --- 3. INTELIGÊNCIA DO CADASTRO AUTOMÁTICO ---
 function buscarClienteCadastro(nomeDigitado) {
     let termo = nomeDigitado.trim().toUpperCase();
     let divSugestoes = document.getElementById("sugestoes_clientes");
@@ -2382,7 +2554,6 @@ function buscarClienteCadastro(nomeDigitado) {
 
     if (filtrados.length === 0) {
         divSugestoes.innerHTML = `<div style="padding:10px; color:#888; font-size:13px;">🆕 Cliente novo. Prossiga com os botões abaixo.</div>`;
-        // Se é novo e o fiscal continuou, libera a escolha da Cidade
         entregaEmEdicao.cliente = termo;
         if(document.getElementById("painel_cascata_botoes").innerHTML === "") {
             renderizarBotoesCidade();
@@ -2403,7 +2574,6 @@ function aplicarClienteCadastrado(nomeCliente) {
     let c = cadastros.find(item => item.nome === nomeCliente);
 
     if (c) {
-        // BUM! Preenche o endereço completo direto do histórico
         document.getElementById("ent_nome_cliente").value = c.nome;
         document.getElementById("sugestoes_clientes").innerHTML = "";
 
@@ -2413,7 +2583,6 @@ function aplicarClienteCadastrado(nomeCliente) {
             caixas: 1, gelados: "Não"
         };
 
-        // Mostra o resumo visual do endereço recuperado
         let painel = document.getElementById("painel_cascata_botoes");
         painel.innerHTML = `
             <div style="background:#d1ecf1; color:#0c5460; padding:12px; border-radius:6px; margin-bottom:10px; border-left:5px solid #17a2b8;">
@@ -2424,7 +2593,6 @@ function aplicarClienteCadastrado(nomeCliente) {
             </div>
         `;
 
-        // Pula as etapas e abre direto os inputs de caixas e gelados
         document.getElementById("formulario_final_entrega").style.display = "block";
         document.getElementById("ent_numero").value = c.numero;
         document.getElementById("ent_apto").value = c.apartamento;
@@ -2433,7 +2601,7 @@ function aplicarClienteCadastrado(nomeCliente) {
     }
 }
 
-// --- 4. RENDERIZADORES DA CASCATA DE BOTÕES (DO EXCEL) ---
+// --- 4. RENDERIZADORES DA CASCATA DE BOTÕES ---
 function renderizarBotoesCidade() {
     let baseRuas = JSON.parse(localStorage.getItem("base_ruas_entrega")) || [];
     let cidades = [...new Set(baseRuas.map(r => r.CIDADE))].sort();
@@ -2453,7 +2621,6 @@ function selecionarCidade(nomeCidade) {
     entregaEmEdicao.cidade = nomeCidade;
     
     let baseRuas = JSON.parse(localStorage.getItem("base_ruas_entrega")) || [];
-    // Filtra bairros estritamente da cidade escolhida
     let bairros = [...new Set(baseRuas.filter(r => r.CIDADE === nomeCidade).map(r => r.BAIRRO))].sort();
 
     let painel = document.getElementById("painel_cascata_botoes");
@@ -2470,7 +2637,6 @@ function selecionarBairro(nomeBairro) {
     entregaEmEdicao.bairro = nomeBairro;
 
     let baseRuas = JSON.parse(localStorage.getItem("base_ruas_entrega")) || [];
-    // Filtra as ruas estritamente pertencentes àquela Cidade e àquele Bairro
     let ruas = baseRuas.filter(r => r.CIDADE === entregaEmEdicao.cidade && r.BAIRRO === nomeBairro).map(r => r.NOME).sort();
 
     let painel = document.getElementById("painel_cascata_botoes");
@@ -2487,7 +2653,6 @@ function selecionarBairro(nomeBairro) {
 function selecionarRua(nomeRua) {
     entregaEmEdicao.rua = nomeRua;
 
-    // 1. Busca a rota correspondente a essa rua específica na planilha
     let baseRuas = JSON.parse(localStorage.getItem("base_ruas_entrega")) || [];
     let ruaEncontrada = baseRuas.find(r => 
         r.CIDADE === entregaEmEdicao.cidade && 
@@ -2495,10 +2660,8 @@ function selecionarRua(nomeRua) {
         r.NOME === nomeRua
     );
     
-    // Define a rota com base na planilha (ou joga 1 se não achar)
     entregaEmEdicao.rota = ruaEncontrada ? ruaEncontrada.ROTA : "1";
 
-    // 2. Limpa o painel de botões em cascata com o resumo
     let painel = document.getElementById("painel_cascata_botoes");
     if (painel) {
         painel.innerHTML = `
@@ -2508,7 +2671,6 @@ function selecionarRua(nomeRua) {
         `;
     }
 
-    // 3. SEGREDO: Força o texto verde original da sua tela a aparecer!
     let elCidade = document.getElementById("lbl_cidade") || document.querySelector("[id*='cidade']") || document.querySelector("[id*='Cidade']");
     let elBairro = document.getElementById("lbl_bairro") || document.querySelector("[id*='bairro']") || document.querySelector("[id*='Bairro']");
     let elRua    = document.getElementById("lbl_rua")    || document.querySelector("[id*='rua']")    || document.querySelector("[id*='Rua']");
@@ -2517,19 +2679,18 @@ function selecionarRua(nomeRua) {
     if (elBairro) elBairro.innerText = "Bairro: " + entregaEmEdicao.bairro;
     if (elRua)    elRua.innerText    = "Rua: " + nomeRua + " (Rota: " + entregaEmEdicao.rota + ")";
 
-    // 4. Mostra o formulário final para digitação do número e caixas
     document.getElementById("formulario_final_entrega").style.display = "block";
     
-    // Coloca o cursor direto no campo número
     let campoNumero = document.getElementById("ent_numero") || document.getElementById("numero_residencia") || document.querySelector("input[placeholder*='Número']");
     if (campoNumero) campoNumero.focus();
 }
+
 function toggleCampoApartamento(valor) {
     document.getElementById("bloco_detalhe_apto").style.display = (valor === "Sim") ? "block" : "none";
 }
 
-// --- 5. GRAVAÇÃO REAL E CRONOMETRAGEM ---
-function salvarNovaEntrega() {
+// --- 5. GRAVAÇÃO REAL E SINCRONIZAÇÃO EM NUVEM ---
+async function salvarNovaEntrega() {
     let nomeCliente = document.getElementById("ent_nome_cliente").value.trim().toUpperCase();
     let num = document.getElementById("ent_numero").value.trim().toUpperCase();
     let apto = document.getElementById("ent_apto").value;
@@ -2543,7 +2704,6 @@ function salvarNovaEntrega() {
 
     let entregasAtuais = JSON.parse(localStorage.getItem("registro_entregas")) || [];
     
-    // Objeto definitivo com carimbo de data e hora para a meta das 4 horas
     let novaEntrega = {
         idEntrega: Date.now(),
         cliente: nomeCliente,
@@ -2560,13 +2720,30 @@ function salvarNovaEntrega() {
         horaLancamento: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         horaFinalizacao: null,
         tempoDecorridoMinutos: null,
-        dentroDoPrazo: true
+        dentroDoPrazo: true,
+        rota: entregaEmEdicao.rota || "1"
     };
 
     entregasAtuais.push(novaEntrega);
     localStorage.setItem("registro_entregas", JSON.stringify(entregasAtuais));
 
-    // --- SALVAMENTO AUTOMÁTICO NO CADASTRO DE CLIENTES (A MÁGICA) ---
+    // Salva na nuvem (Google Sheets)
+    try {
+        if (typeof URL_API_GAS !== 'undefined' && URL_API_GAS) {
+            await fetch(URL_API_GAS, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    acao: "salvarEntrega",
+                    ...novaEntrega
+                })
+            });
+        }
+    } catch (e) {
+        console.warn("Entrega salva localmente, falha ao sincronizar com a nuvem.", e);
+    }
+
     let cadastros = JSON.parse(localStorage.getItem("cadastro_clientes_entrega")) || [];
     if (!cadastros.some(item => item.nome === nomeCliente)) {
         cadastros.push({
@@ -2577,33 +2754,42 @@ function salvarNovaEntrega() {
     }
 
     alert(`✅ Sucesso!\nTicket Gerado para ${nomeCliente}.\nMeta de Entrega: até às ${calcularHoraLimite(novaEntrega.horaLancamento)}`);
-    abrirAbaLancamentoEntrega(); // Limpa e reinicia para a próxima venda
+    abrirAbaLancamentoEntrega();
 }
 
 function calcularHoraLimite(horaString) {
     let partes = horaString.split(":");
-    let h = (parseInt(partes[0]) + 4) % 24; // Soma as 4 horas da meta
+    let h = (parseInt(partes[0]) + 4) % 24;
     return `${h.toString().padStart(2, '0')}:${partes[1]}`;
 }
 
-// --- ABA DO MOTORISTA: ROTEIRO POR COLUNA ROTA (COM CONTADORES E MEMÓRIA DE GAVETA ABERTA) ---
-function abrirAbaMotoristaEntrega(rotaParaManterAberta = null) {
+// --- ABA DO MOTORISTA (COM SINCRONIZAÇÃO EM NUVEM) ---
+async function abrirAbaMotoristaEntrega(rotaParaManterAberta = null) {
     let container = document.querySelector(".container");
     if (!container) return;
 
+    // Tenta atualizar as entregas da nuvem antes de renderizar
+    try {
+        if (typeof URL_API_GAS !== 'undefined' && URL_API_GAS) {
+            let resposta = await fetch(`${URL_API_GAS}?acao=obterEntregas`);
+            let dadosNuvem = await resposta.json();
+            if (dadosNuvem && Array.isArray(dadosNuvem) && dadosNuvem.length > 0) {
+                localStorage.setItem("registro_entregas", JSON.stringify(dadosNuvem));
+            }
+        }
+    } catch (e) {
+        console.warn("Usando base de entregas local.", e);
+    }
+
     let entregas = JSON.parse(localStorage.getItem("registro_entregas")) || [];
-    
-    // Filtra tudo o que ainda não foi finalizado (Pendente + Em Trânsito)
     let ativas = entregas.filter(e => e.status === "Pendente" || e.status === "Em Trânsito");
 
-    // Contadores gerenciais do topo
     let totalNaLoja = entregas.filter(e => e.status === "Pendente").length;
     let totalNoCarro = entregas.filter(e => e.status === "Em Trânsito").length;
 
-    // Agrupa as entregas por Rota
     let rotasAgrupadas = {};
     ativas.forEach(e => {
-        let numRota = e.rota || e.ROTA || "GERAL";
+        let numRota = e.rota || e.ROTA || "1";
         let identificadorRota = "ROTA " + numRota;
         
         if (!rotasAgrupadas[identificadorRota]) {
@@ -2644,8 +2830,6 @@ function abrirAbaMotoristaEntrega(rotaParaManterAberta = null) {
                     return numA - numB;
                 }).map(nomeRota => {
                     let dadosRota = rotasAgrupadas[nomeRota];
-                    
-                    // Verifica se esta gaveta deve iniciar aberta (via clique anterior)
                     let deveAbrir = (nomeRota === rotaParaManterAberta) ? "open" : "";
                     
                     return `
@@ -2709,21 +2893,37 @@ function abrirAbaMotoristaEntrega(rotaParaManterAberta = null) {
     `;
 }
 
-// --- FUNÇÃO PARA INSERIR UMA COMPRA INDIVIDUAL NO CARRO ---
-function inserirCompraNaRota(idEntrega, nomeRota) {
+// --- ATUALIZAÇÃO DE STATUS NA NUVEM ---
+async function inserirCompraNaRota(idEntrega, nomeRota) {
     let entregas = JSON.parse(localStorage.getItem("registro_entregas")) || [];
     let item = entregas.find(e => (e.idEntrega || e.id) == idEntrega);
 
     if (item) {
         item.status = "Em Trânsito";
         localStorage.setItem("registro_entregas", JSON.stringify(entregas));
-        // Recarrega mantendo a mesma gaveta de rota aberta
+
+        try {
+            if (typeof URL_API_GAS !== 'undefined' && URL_API_GAS) {
+                await fetch(URL_API_GAS, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        acao: "atualizarStatusEntrega",
+                        idEntrega: item.idEntrega || item.id,
+                        status: "Em Trânsito"
+                    })
+                });
+            }
+        } catch (e) {
+            console.warn("Erro ao atualizar status na nuvem.", e);
+        }
+
         abrirAbaMotoristaEntrega(nomeRota || window.lastOpenedRoute); 
     }
 }
 
-// --- MUDANÇA DE STATUS DA ENTREGA (MOTORISTA) ---
-function mudarStatusEntrega(idEntrega, novoStatus, nomeRota) {
+async function mudarStatusEntrega(idEntrega, novoStatus, nomeRota) {
     let entregas = JSON.parse(localStorage.getItem("registro_entregas")) || [];
     let entregaEncontrada = entregas.find(e => (e.idEntrega || e.id) == idEntrega);
     
@@ -2736,8 +2936,25 @@ function mudarStatusEntrega(idEntrega, novoStatus, nomeRota) {
         
         localStorage.setItem("registro_entregas", JSON.stringify(entregas));
         
+        try {
+            if (typeof URL_API_GAS !== 'undefined' && URL_API_GAS) {
+                await fetch(URL_API_GAS, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        acao: "atualizarStatusEntrega",
+                        idEntrega: entregaEncontrada.idEntrega || entregaEncontrada.id,
+                        status: novoStatus,
+                        horaFinalizacao: entregaEncontrada.horaFinalizacao || ""
+                    })
+                });
+            }
+        } catch (e) {
+            console.warn("Erro ao atualizar status final na nuvem.", e);
+        }
+        
         alert(`📦 Entrega de ${entregaEncontrada.cliente} marcada como: ${novoStatus}!`);
-        // Recarrega mantendo a mesma gaveta de rota aberta para finalizar as próximas se houver
         abrirAbaMotoristaEntrega(nomeRota || window.lastOpenedRoute);
     } else {
         alert("⚠️ Erro: Entrega não encontrada na base de dados.");
