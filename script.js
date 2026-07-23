@@ -789,7 +789,7 @@ function finalizarEGravarMissao() {
 }
 
 // ==========================================
-// 9. REPOSITOR: ABA VALIDADE (PRODUTOS) - COMPLETO
+// 9. REPOSITOR: ABA VALIDADE (PRODUTOS) - COMPLETO COM LEITURA AUTOMÁTICA
 // ==========================================
 function abrirAbaValidade() {
     document.querySelector(".container").innerHTML = `
@@ -798,7 +798,7 @@ function abrirAbaValidade() {
         </div>
         <div class="login" style="max-width:100%;">
             
-            <!-- Câmera Nativa idêntica ao padrão de etiquetas -->
+            <!-- Câmera Nativa com Leitura Automática de Imagem -->
             <div style="text-align: center; margin-bottom: 15px;">
                 <label for="cameraInputValidade" style="background: #007bff; color: white; padding: 12px 20px; border-radius: 5px; font-weight: bold; display: inline-block; cursor: pointer;">
                     📷 Abrir Câmera
@@ -816,11 +816,35 @@ function abrirAbaValidade() {
     `;
 }
 
-function processarFotoValidade(input) {
+// Função que lê automaticamente o código de barras da foto tirada pela câmera
+async function processarFotoValidade(input) {
     if (input.files && input.files[0]) {
+        let arquivo = input.files[0];
         let display = document.getElementById("resultado-validade");
         display.style.display = "block";
-        display.innerHTML = `<p style="text-align:center; color:#28a745; font-weight:bold;">✅ Foto capturada! Digite ou confirme o código acima para buscar.</p>`;
+        display.innerHTML = `<p style="text-align:center; color:#007bff;">⏳ Lendo código de barras da foto...</p>`;
+
+        try {
+            // Usa a biblioteca Html5Qrcode para decodificar o arquivo de imagem tirado
+            let html5QrCode = new Html5Qrcode("resultado-validade-temp-scan"); // Elemento invisível ou direto
+            let qrCodeSuccessCallback = (decodedText) => {
+                document.getElementById("input-manual-code").value = decodedText;
+                buscarProdutoValidade(decodedText);
+            };
+            
+            // Realiza a leitura do arquivo de imagem
+            Html5Qrcode.scanFile(arquivo, true)
+                .then(decodedText => {
+                    document.getElementById("input-manual-code").value = decodedText;
+                    buscarProdutoValidade(decodedText);
+                })
+                .catch(err => {
+                    display.innerHTML = `<p style="color:red; text-align:center;">❌ Não foi possível ler o código na foto. Digite o código manualmente abaixo.</p>`;
+                });
+
+        } catch (e) {
+            display.innerHTML = `<p style="color:red; text-align:center;">❌ Erro ao processar a imagem. Digite o código manualmente.</p>`;
+        }
     }
 }
 
