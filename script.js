@@ -789,7 +789,7 @@ function finalizarEGravarMissao() {
 }
 
 // ==========================================
-// 9. REPOSITOR: ABA VALIDADE (PRODUTOS)
+// 9. REPOSITOR: ABA VALIDADE (PRODUTOS) - COMPLETO
 // ==========================================
 function abrirAbaValidade() {
     document.querySelector(".container").innerHTML = `
@@ -798,46 +798,29 @@ function abrirAbaValidade() {
         </div>
         <div class="login" style="max-width:100%;">
             
-            <!-- 📷 BOTÃO DE CÂMERA NATIVA (À prova de falhas em Android/iOS) -->
+            <!-- Botão de Câmera Nativa (À prova de falhas em Android e iOS) -->
             <div style="text-align: center; margin-bottom: 15px;">
                 <label for="cameraInputValidade" style="background: #0d6efd; color: white; padding: 12px 15px; border-radius: 5px; font-weight: bold; display: block; cursor: pointer; font-size: 15px;">
-                    📷 Abrir Câmera (Leitura Direta)
+                    📷 Abrir Câmera / Tirar Foto
                 </label>
                 <input type="file" id="cameraInputValidade" accept="image/*" capture="environment" style="display: none;" onchange="processarFotoValidade(this)">
             </div>
-
-            <div id="leitor-camera" style="width: 100%; max-width: 350px; margin: 0 auto; display:none;"></div>
             
-            <input type="text" id="input-manual-code" placeholder="Ou digite o código de barras">
-            <button onclick="buscarProdutoValidade(document.getElementById('input-manual-code').value)" style="padding:10px; margin-top:5px; background:#6c757d; color:white; width:100%; border:none; border-radius:5px; font-weight:bold;">Buscar Manual</button>
+            <input type="text" id="input-manual-code" placeholder="Digite o código de barras ou nome">
+            <button onclick="buscarProdutoValidade(document.getElementById('input-manual-code').value)" style="padding:10px; margin-top:5px; background:#0d6efd; color:white; width:100%; border:none; border-radius:5px; font-weight:bold; cursor:pointer;">🔍 Buscar Produto</button>
             
-            <div id="resultado-validade" style="margin-top: 20px; display:none; text-align:left; background:#f9f9f9; padding:15px; border-radius:5px;"></div>
+            <div id="resultado-validade" style="margin-top: 20px; display:none; text-align:left; background:#f9f9f9; padding:15px; border-radius:5px; border: 1px solid #ddd;"></div>
             <br>
-            <button onclick="voltarMenuPrincipal()" style="background:#6c757d; color:white; width:100%; padding:10px; border:none; border-radius:5px; font-weight:bold;">Voltar ao Menu</button>
+            <button onclick="voltarMenuPrincipal()" style="background:#6c757d; color:white; width:100%; padding:10px; border:none; border-radius:5px; font-weight:bold; cursor:pointer;">⬅️ Voltar ao Menu</button>
         </div>
     `;
-
-    // Tentativa opcional da biblioteca antiga (caso queira manter como secundária, ou pode remover se preferir apenas a nativa)
-    try {
-        html5QrcodeScanner = new Html5QrcodeScanner("leitor-camera", { fps: 10, qrbox: 250 });
-        html5QrcodeScanner.render((txtCodigo) => {
-            try { html5QrcodeScanner.clear(); } catch(e) {}
-            buscarProdutoValidade(txtCodigo);
-        }, (erro) => {});
-    } catch(err) {}
 }
 
-// Função auxiliar para processar a foto tirada pela câmera nativa na Validade
 function processarFotoValidade(input) {
     if (input.files && input.files[0]) {
-        let arquivo = input.files[0];
         let display = document.getElementById("resultado-validade");
         display.style.display = "block";
-        display.innerHTML = `<p style="text-align:center; color:#6c757d;">📷 Foto capturada! Processando imagem...</p>`;
-        
-        // Se estiver usando alguma biblioteca de leitura de imagem por arquivo, chame aqui. 
-        // Caso queira apenas simular ou testar o fluxo integrado:
-        console.log("Arquivo de imagem da câmera:", arquivo.name);
+        display.innerHTML = `<p style="text-align:center; color:#28a745; font-weight:bold;">✅ Foto capturada! Digite o código do produto acima para continuar.</p>`;
     }
 }
 
@@ -916,7 +899,6 @@ function salvarDataValidade(codigo, descricao) {
     alert("Salvo! Quantidade: " + qtd);
     abrirAbaValidade(); 
 }
-
 // ==========================================
 // 10. REPOSITOR: ABA PREÇOS (MANUAL) - NUVEM / GOOGLE SHEETS
 // ==========================================
