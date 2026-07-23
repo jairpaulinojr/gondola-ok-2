@@ -798,16 +798,16 @@ function abrirAbaValidade() {
         </div>
         <div class="login" style="max-width:100%;">
             
-            <!-- Botão de Câmera Nativa (À prova de falhas em Android e iOS) -->
+            <!-- Câmera Nativa idêntica ao padrão de etiquetas -->
             <div style="text-align: center; margin-bottom: 15px;">
-                <label for="cameraInputValidade" style="background: #0d6efd; color: white; padding: 12px 15px; border-radius: 5px; font-weight: bold; display: block; cursor: pointer; font-size: 15px;">
-                    📷 Abrir Câmera / Tirar Foto
+                <label for="cameraInputValidade" style="background: #007bff; color: white; padding: 12px 20px; border-radius: 5px; font-weight: bold; display: inline-block; cursor: pointer;">
+                    📷 Abrir Câmera
                 </label>
                 <input type="file" id="cameraInputValidade" accept="image/*" capture="environment" style="display: none;" onchange="processarFotoValidade(this)">
             </div>
             
-            <input type="text" id="input-manual-code" placeholder="Digite o código de barras ou nome">
-            <button onclick="buscarProdutoValidade(document.getElementById('input-manual-code').value)" style="padding:10px; margin-top:5px; background:#0d6efd; color:white; width:100%; border:none; border-radius:5px; font-weight:bold; cursor:pointer;">🔍 Buscar Produto</button>
+            <input type="text" id="input-manual-code" placeholder="Bipe ou digite o item...">
+            <button onclick="buscarProdutoValidade(document.getElementById('input-manual-code').value)" style="padding:10px; margin-top:5px; background:#28a745; color:white; width:100%; border:none; border-radius:5px; font-weight:bold; cursor:pointer;">🔍 VERIFICAR PRODUTO</button>
             
             <div id="resultado-validade" style="margin-top: 20px; display:none; text-align:left; background:#f9f9f9; padding:15px; border-radius:5px; border: 1px solid #ddd;"></div>
             <br>
@@ -820,7 +820,7 @@ function processarFotoValidade(input) {
     if (input.files && input.files[0]) {
         let display = document.getElementById("resultado-validade");
         display.style.display = "block";
-        display.innerHTML = `<p style="text-align:center; color:#28a745; font-weight:bold;">✅ Foto capturada! Digite o código do produto acima para continuar.</p>`;
+        display.innerHTML = `<p style="text-align:center; color:#28a745; font-weight:bold;">✅ Foto capturada! Digite ou confirme o código acima para buscar.</p>`;
     }
 }
 
@@ -899,6 +899,8 @@ function salvarDataValidade(codigo, descricao) {
     alert("Salvo! Quantidade: " + qtd);
     abrirAbaValidade(); 
 }
+
+
 // ==========================================
 // 10. REPOSITOR: ABA PREÇOS (MANUAL) - NUVEM / GOOGLE SHEETS
 // ==========================================
