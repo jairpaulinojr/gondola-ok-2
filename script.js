@@ -788,64 +788,71 @@ function finalizarEGravarMissao() {
     `;
 }
 
+// Variable global para controlar o leitor da câmera e evitar travamentos
+let scannerValidade = null;
+
 // ==========================================
-// 9. REPOSITOR: ABA VALIDADE (PRODUTOS) - COMPLETO COM LEITURA AUTOMÁTICA
+// 9. REPOSITOR: ABA VALIDADE (PRODUTOS)
 // ==========================================
 function abrirAbaValidade() {
+    // Se houver alguma câmera aberta anteriormente, encerra para liberar o hardware
+    if (scannerValidade) {
+        try { scannerValidade.clear(); } catch(e) {}
+        scannerValidade = null;
+    }
+
     document.querySelector(".container").innerHTML = `
         <div class="topo">
             <h1>📅 VERIFICAÇÃO DE VALIDADE</h1>
         </div>
         <div class="login" style="max-width:100%;">
             
-            <!-- Câmera Nativa com Leitura Automática de Imagem -->
-            <div style="text-align: center; margin-bottom: 15px;">
-                <label for="cameraInputValidade" style="background: #007bff; color: white; padding: 12px 20px; border-radius: 5px; font-weight: bold; display: inline-block; cursor: pointer;">
-                    📷 Abrir Câmera
-                </label>
-                <input type="file" id="cameraInputValidade" accept="image/*" capture="environment" style="display: none;" onchange="processarFotoValidade(this)">
-            </div>
+            <!-- ÁREA DA CÂMERA AO VIVO (LEITURA EM TEMPO REAL) -->
+            <div id="leitor-camera" style="width: 100%; max-width: 350px; margin: 0 auto;"></div>
+            <br>
             
             <input type="text" id="input-manual-code" placeholder="Bipe ou digite o item...">
             <button onclick="buscarProdutoValidade(document.getElementById('input-manual-code').value)" style="padding:10px; margin-top:5px; background:#28a745; color:white; width:100%; border:none; border-radius:5px; font-weight:bold; cursor:pointer;">🔍 VERIFICAR PRODUTO</button>
             
             <div id="resultado-validade" style="margin-top: 20px; display:none; text-align:left; background:#f9f9f9; padding:15px; border-radius:5px; border: 1px solid #ddd;"></div>
             <br>
-            <button onclick="voltarMenuPrincipal()" style="background:#6c757d; color:white; width:100%; padding:10px; border:none; border-radius:5px; font-weight:bold; cursor:pointer;">⬅️ Voltar ao Menu</button>
+            <button onclick="fecharValidadeEVoltar()" style="background:#6c757d; color:white; width:100%; padding:10px; border:none; border-radius:5px; font-weight:bold; cursor:pointer;">⬅️ Voltar ao Menu</button>
         </div>
     `;
+
+    // Inicia a câmera em tempo real para ler o código de barras automaticamente
+    setTimeout(() => {
+        try {
+            scannerValidade = new Html5QrcodeScanner("leitor-camera", { 
+                fps: 10, 
+                qrbox: { width: 250, height: 150 }
+            });
+
+            scannerValidade.render((codigoLido) => {
+                // ASSIM QUE A CÂMERA RECONHECER O CÓDIGO DE BARRAS:
+                document.getElementById("input-manual-code").value = codigoLido;
+                
+                // Fecha a câmera para economizar bateria/processamento
+                try { scannerValidade.clear(); } catch(e) {}
+                scannerValidade = null;
+                
+                // Dispara a busca do produto automaticamente
+                buscarProdutoValidade(codigoLido);
+            }, (erro) => {
+                // Busca contínua da câmera (erros normais de enquadramento são ignorados)
+            });
+        } catch (err) {
+            console.error("Erro ao abrir a câmera ao vivo:", err);
+        }
+    }, 200);
 }
 
-// Função que lê automaticamente o código de barras da foto tirada pela câmera
-async function processarFotoValidade(input) {
-    if (input.files && input.files[0]) {
-        let arquivo = input.files[0];
-        let display = document.getElementById("resultado-validade");
-        display.style.display = "block";
-        display.innerHTML = `<p style="text-align:center; color:#007bff;">⏳ Lendo código de barras da foto...</p>`;
-
-        try {
-            // Usa a biblioteca Html5Qrcode para decodificar o arquivo de imagem tirado
-            let html5QrCode = new Html5Qrcode("resultado-validade-temp-scan"); // Elemento invisível ou direto
-            let qrCodeSuccessCallback = (decodedText) => {
-                document.getElementById("input-manual-code").value = decodedText;
-                buscarProdutoValidade(decodedText);
-            };
-            
-            // Realiza a leitura do arquivo de imagem
-            Html5Qrcode.scanFile(arquivo, true)
-                .then(decodedText => {
-                    document.getElementById("input-manual-code").value = decodedText;
-                    buscarProdutoValidade(decodedText);
-                })
-                .catch(err => {
-                    display.innerHTML = `<p style="color:red; text-align:center;">❌ Não foi possível ler o código na foto. Digite o código manualmente abaixo.</p>`;
-                });
-
-        } catch (e) {
-            display.innerHTML = `<p style="color:red; text-align:center;">❌ Erro ao processar a imagem. Digite o código manualmente.</p>`;
-        }
+function fecharValidadeEVoltar() {
+    if (scannerValidade) {
+        try { scannerValidade.clear(); } catch(e) {}
+        scannerValidade = null;
     }
+    voltarMenuPrincipal();
 }
 
 async function buscarProdutoValidade(codigoBarras) {
@@ -878,7 +885,7 @@ async function buscarProdutoValidade(codigoBarras) {
             <input type="date" id="data-venc" style="width:100%; padding:8px; margin: 10px 0;">
             <label><strong>Quantidade:</strong></label>
             <input type="number" id="qtd-venc" value="1" style="width:100%; padding:8px; margin: 10px 0;">
-            <button onclick="salvarDataValidade('${produtoEncontrado.codigo}', '${produtoEncontrado.descricao.replace(/'/g, "\\'")}')" style="background:#28a745; color:white; width:100%; padding:10px; border:none; border-radius:5px; font-weight:bold;">Salvar Data e Qtd</button>
+            <button onclick="salvarDataValidade('${produtoEncontrado.codigo}', '${produtoEncontrado.descricao.replace(/'/g, "\\'")}')" style="background:#28a745; color:white; width:100%; padding:10px; border:none; border-radius:5px; font-weight:bold; cursor:pointer;">Salvar Data e Qtd</button>
         `;
     } catch (e) {
         let baseMestre = JSON.parse(localStorage.getItem("gondola_base_global")) || [];
@@ -896,7 +903,7 @@ async function buscarProdutoValidade(codigoBarras) {
             <input type="date" id="data-venc" style="width:100%; padding:8px; margin: 10px 0;">
             <label><strong>Quantidade:</strong></label>
             <input type="number" id="qtd-venc" value="1" style="width:100%; padding:8px; margin: 10px 0;">
-            <button onclick="salvarDataValidade('${produtoEncontrado.codigo}', '${produtoEncontrado.descricao.replace(/'/g, "\\'")}')" style="background:#28a745; color:white; width:100%; padding:10px; border:none; border-radius:5px; font-weight:bold;">Salvar Data e Qtd</button>
+            <button onclick="salvarDataValidade('${produtoEncontrado.codigo}', '${produtoEncontrado.descricao.replace(/'/g, "\\'")}')" style="background:#28a745; color:white; width:100%; padding:10px; border:none; border-radius:5px; font-weight:bold; cursor:pointer;">Salvar Data e Qtd</button>
         `;
     }
 }
@@ -920,10 +927,9 @@ function salvarDataValidade(codigo, descricao) {
     });
     localStorage.setItem("registro_validades", JSON.stringify(registros));
     
-    alert("Salvo! Quantidade: " + qtd);
+    alert("Salvo com sucesso! Quantidade: " + qtd);
     abrirAbaValidade(); 
 }
-
 
 // ==========================================
 // 10. REPOSITOR: ABA PREÇOS (MANUAL) - NUVEM / GOOGLE SHEETS
