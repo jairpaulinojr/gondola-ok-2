@@ -2798,9 +2798,25 @@ async function salvarNovaEntrega() {
 }
 
 function calcularHoraLimite(horaString) {
+    if (!horaString) return "--:--";
+    
     let partes = horaString.split(":");
-    let h = (parseInt(partes[0]) + 4) % 24;
-    return `${h.toString().padStart(2, '0')}:${partes[1]}`;
+    let h = parseInt(partes[0]);
+    let m = partes[1];
+    
+    // Se foi feito após as 18h, o prazo de 4h começa às 10h do dia seguinte (limite às 14h)
+    if (h >= 18) {
+        return "14:00 (Próx. Dia)";
+    }
+    
+    // Se foi antes das 10h, considera o início do expediente às 10h
+    if (h < 10) {
+        h = 10;
+    }
+    
+    // Soma as 4 horas da meta
+    let horaFinal = (h + 4) % 24;
+    return `${horaFinal.toString().padStart(2, '0')}:${m}`;
 }
 
 // --- ABA DO MOTORISTA (COM SINCRONIZAÇÃO EM NUVEM) ---
