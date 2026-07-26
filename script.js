@@ -1112,6 +1112,103 @@ window.atualizarStatusNuvem = async function(codigo, dataValidade, novoStatus) {
     
     abrirRelatorioValidadesGerente();
 };
+
+
+async function abrirRelatorioValidadesGerente() {
+    let container = document.querySelector(".container");
+    if (!container) return;
+
+    // Busca dados atualizados da nuvem (ou localStorage)
+    let resposta = await fetch(URL_API_GAS + "?acao=obterValidades");
+    let validades = await resposta.json();
+
+    let linhasHtml = validades.map((item, index) => `
+        <tr style="border-bottom: 1px solid #ddd;">
+            <td style="padding: 8px;">${item.validade}</td>
+            <td style="padding: 8px;">${item.codigo}</td>
+            <td style="padding: 8px;">${item.descricao}</td>
+            <td style="padding: 8px; text-align:center;">${item.quantidade}</td>
+            <td style="padding: 8px; text-align:center;">
+                <select onchange="atualizarTratativaValidade('${item.codigo}', this.value)" style="padding: 4px; font-weight:bold;">
+                    <option value="Pendente" ${item.tratar === 'Pendente' ? 'selected' : ''}>Pendente</option>
+                    <option value="Rebaixa" ${item.tratar === 'Rebaixa' ? 'selected' : ''}>Rebaixa</option>
+                    <option value="Resolvido" ${item.tratar === 'Resolvido' ? 'selected' : ''}>Resolvido</option>
+                </select>
+            </td>
+        </tr>
+    `).join("");
+
+    container.innerHTML = `
+        <div class="topo"><h1>📅 CONTROLE DE VENCIMENTOS</h1></div>
+        <div class="login" style="text-align: left; max-width: 100%;">
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <button onclick="exportarValidadeExcel()" style="background:#28a745; color:white; flex:1;">📥 Baixar Relatório em Excel</button>
+                <button onclick="abrirPainelAdmin()" style="background:#6c757d; color:white; flex:1;">⬅️ Voltar ao Painel</button>
+            </div>
+
+            <div style="max-height: 350px; overflow-y: auto; background: white; border: 1px solid #ccc; border-radius: 4px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+                    <thead>
+                        <tr style="background: #efefef; position: sticky; top: 0;">
+                            <th style="padding: 8px;">Validade</th>
+                            <th style="padding: 8px;">Código</th>
+                            <th style="padding: 8px;">Descrição</th>
+                            <th style="padding: 8px; text-align:center;">Qtd</th>
+                            <th style="padding: 8px; text-align:center;">Tratar</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${validades.length === 0 ? `<tr><td colspan="5" style="padding:15px; text-align:center; color:#777;">Nenhum produto próximo ao vencimento.</td></tr>` : linhasHtml}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
+// Função para atualizar o status e remover da tela/planilha se for "Resolvido"
+async function atualizarTratativaValidade(codigo, novoStatus) {
+    try {
+        await fetch(URL_API_GAS, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                acao: "atualizarStatusValidade",
+                codigo: codigo,
+                tratar: novoStatus
+            })
+        });
+
+        if (novoStatus === "Resolvido") {
+            alert("✅ Item resolvido e removido do arquivo com sucesso!");
+        } else {
+            alert("✅ Tratativa atualizada para: " + novoStatus);
+        }
+        
+        abrirRelatorioValidadesGerente(); // Recarrega a tela
+    } catch (e) {
+        console.error("Erro ao atualizar tratativa:", e);
+        alert("Erro ao atualizar na nuvem.");
+    }
+}
+
+// Função para gerar o arquivo Excel (.xlsx)
+async function exportarValidadeExcel() {
+    let resposta = await fetch(URL_API_GAS + "?acao=obterValidades");
+    let dados = await resposta.json();
+
+    if (!dados || dados.length === 0) {
+        alert("Não há dados para exportar!");
+        return;
+    }
+
+    let ws = XLSX.utils.json_to_sheet(dados);
+    let wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Validades");
+    XLSX.writeFile(wb, "Relatorio_Validade_" + new Date().toLocaleDateString("pt-BR").replace(/\//g, "-") + ".xlsx");
+}
 // ==========================================
 // 12. GERENTE: SELEÇÃO DE ABAS AUDITORIA
 // ==========================================
@@ -2155,27 +2252,19 @@ function fecharCameraColetor(){
 }
 
 
-
-
-
 function buscarProdutoNaBaseGlobal(){
 
-    let input=document.getElementById("input_coletor_etiqueta");
-    let resultado=document.getElementById("resultado_busca_coletor");
-
+    let input = document.getElementById("input_coletor_etiqueta");
+    let resultado = document.getElementById("resultado_busca_coletor");
 
     if(!input || !resultado) return;
 
-
-    let termo=input.value.trim().toUpperCase();
-
+    let termo = input.value.trim().toUpperCase();
 
     if(!termo){
         alert("Digite ou bipe um produto!");
         return;
     }
-
-
 
     let baseGlobal =
     JSON.parse(localStorage.getItem("base_global")) ||
@@ -2183,18 +2272,12 @@ function buscarProdutoNaBaseGlobal(){
     JSON.parse(localStorage.getItem("gondola_produtos_config")) ||
     [];
 
-
-
-    let encontrado=null;
-
-
+    let encontrado = null;
 
     for(let item of baseGlobal){
-
         if(!item) continue;
 
-
-        let codigo=
+        let codigo =
         (item.codigo ||
         item.cod_barra ||
         item.barcode ||
@@ -2203,9 +2286,7 @@ function buscarProdutoNaBaseGlobal(){
         .toString()
         .trim();
 
-
-
-        let nome=
+        let nome =
         (item.produto ||
         item.descricao ||
         item.pergunta ||
@@ -2213,22 +2294,13 @@ function buscarProdutoNaBaseGlobal(){
         "")
         .toUpperCase();
 
-
-
-        if(codigo===termo || (termo.length>3 && nome.includes(termo))){
-
-            encontrado=item;
+        if(codigo === termo || (termo.length > 3 && nome.includes(termo))){
+            encontrado = item;
             break;
         }
-
     }
 
-
-
-
     if(encontrado){
-
-
         let nome =
         encontrado.produto ||
         encontrado.descricao ||
@@ -2236,141 +2308,79 @@ function buscarProdutoNaBaseGlobal(){
         encontrado.nome ||
         termo;
 
-
-
-        produtoColetorSelecionado={
-
-            codigo:
-            encontrado.codigo || termo,
-
-            nome:nome,
-
-            setor:
-            encontrado.setor || "Geral"
+        produtoColetorSelecionado = {
+            codigo: encontrado.codigo || termo,
+            nome: nome,
+            setor: encontrado.setor || "Geral"
         };
 
-
-
-        resultado.innerHTML=`
-
+        resultado.innerHTML = `
         <div style="background:#d4edda;padding:15px;border-radius:6px;">
-        
-        <strong>✅ PRODUTO ENCONTRADO</strong>
-
-        <p style="font-weight:bold;font-size:16px;">
-        ${nome}
-        </p>
-
-        <small>
-        📍 Setor: ${produtoColetorSelecionado.setor}
-        </small>
-
+            <strong>✅ PRODUTO ENCONTRADO</strong>
+            <p style="font-weight:bold;font-size:16px;">${nome}</p>
+            <small>📍 Setor: ${produtoColetorSelecionado.setor}</small>
         </div>
-
-
         <button onclick="confirmarEGravarEtiquetaPendente()"
         style="width:100%;padding:16px;background:#28a745;color:white;border:0;border-radius:6px;margin-top:15px;font-weight:bold;">
         💾 Confirmar e Gerar Etiqueta
         </button>
-
         `;
-
-
-    }else{
-
-
-        produtoColetorSelecionado={
-
-            codigo:termo,
-            nome:termo,
-            setor:"Coleta Avulsa"
-
+    } else {
+        produtoColetorSelecionado = {
+            codigo: termo,
+            nome: termo,
+            setor: "Coleta Avulsa"
         };
 
-
-        resultado.innerHTML=`
-
+        resultado.innerHTML = `
         <div style="background:#fff3cd;padding:15px;border-radius:6px;">
-        ⚠️ Produto não localizado.
-        <br><br>
-        Será salvo como:
-        <b>${termo}</b>
+            ⚠️ Produto não localizado.
+            <br><br>
+            Será salvo como:
+            <b>${termo}</b>
         </div>
-
-
         <button onclick="confirmarEGravarEtiquetaPendente()"
         style="width:100%;padding:16px;background:#ffc107;border:0;border-radius:6px;margin-top:15px;font-weight:bold;">
         ⚠️ Confirmar Etiqueta
         </button>
-
         `;
-
     }
-
 }
 
-
-
-
-
 async function confirmarEGravarEtiquetaPendente(){
-
 
     if(!produtoColetorSelecionado){
         alert("Nenhum produto selecionado!");
         return;
     }
 
+    let lista = JSON.parse(localStorage.getItem("etiquetas_pendentes")) || [];
 
-    let lista =
-    JSON.parse(localStorage.getItem("etiquetas_pendentes")) || [];
-
-
-    let nome =
-    produtoColetorSelecionado.nome
+    let nome = produtoColetorSelecionado.nome
     .toString()
     .trim()
     .toUpperCase();
 
-
-
-    let novaEtiqueta={
-
-        id:Date.now()+Math.random(),
-
-        codigo:
-        produtoColetorSelecionado.codigo,
-
-        produto:nome,
-
-        descricao:nome,
-
-        pergunta:nome,
-
-        setor:
-        produtoColetorSelecionado.setor,
-
-        data:
-        new Date().toLocaleDateString("pt-BR"),
-
-        precificado:false,
-
-        status:"PENDENTE"
-
+    let novaEtiqueta = {
+        id: Date.now() + Math.random(),
+        codigo: produtoColetorSelecionado.codigo,
+        produto: nome,
+        descricao: nome,
+        pergunta: nome,
+        setor: produtoColetorSelecionado.setor,
+        data: new Date().toLocaleDateString("pt-BR"),
+        precificado: false,
+        status: "PENDENTE"
     };
 
-
-
     lista.push(novaEtiqueta);
-
-
 
     localStorage.setItem(
         "etiquetas_pendentes",
         JSON.stringify(lista)
     );
 
-    // Sincronização em nuvem (Google Sheets)
+    // Sincronização em nuvem (Google Sheets) com a ação correta
     try {
         if (typeof URL_API_GAS !== 'undefined' && URL_API_GAS) {
             await fetch(URL_API_GAS, {
@@ -2387,42 +2397,20 @@ async function confirmarEGravarEtiquetaPendente(){
         console.warn("Erro ao sincronizar etiqueta com a nuvem, salva localmente.", e);
     }
 
+    alert("✅ Etiqueta salva:\n\n" + nome);
 
-
-    alert(
-        "✅ Etiqueta salva:\n\n" + nome
-    );
-
-
-
-    // Mantém na tela do coletor
     produtoColetorSelecionado = null;
 
-
-
     let campo = document.getElementById("input_coletor_etiqueta");
-
     if(campo){
-
         campo.value = "";
-
         campo.focus();
-
     }
 
-
-
-    let resultado =
-    document.getElementById("resultado_busca_coletor");
-
-
+    let resultado = document.getElementById("resultado_busca_coletor");
     if(resultado){
-
         resultado.innerHTML = "";
-
     }
-
-
 }
 
 // ==========================================================
