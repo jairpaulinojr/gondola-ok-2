@@ -6,6 +6,7 @@ async function salvarDiaDaGestaoNoHist() {
     let historico = JSON.parse(localStorage.getItem("gondola_historico_checklists")) || [];
 
     let analiseGestao = {
+        acao: "salvarDiaDaGestao", // Adicionado para a nuvem identificar a ação se necessário
         idSessao: Date.now(),
         setor: "Checklist Operacional",
         tipoMissao: "DIA_GESTAO",
@@ -27,15 +28,17 @@ async function salvarDiaDaGestaoNoHist() {
     historico.push(analiseGestao);
     localStorage.setItem("gondola_historico_checklists", JSON.stringify(historico));
 
-    // 2. Envia para o Google Sheets via API
+    // 2. Envia para o Google Sheets via API usando a variável correta URL_API
     try {
-        await fetch(URL_API, {
-            method: "POST",
-            mode: "no-cors",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(analiseGestao)
-        });
-        console.log("Dados sincronizados com sucesso!");
+        if (typeof URL_API !== 'undefined' && URL_API) {
+            await fetch(URL_API, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(analiseGestao)
+            });
+            console.log("Dados sincronizados com sucesso!");
+        }
     } catch (error) {
         console.error("Erro ao sincronizar com a nuvem:", error);
     }
