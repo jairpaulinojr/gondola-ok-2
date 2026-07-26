@@ -3007,3 +3007,41 @@ async function mudarStatusEntrega(idEntrega, novoStatus, nomeRota) {
         alert("⚠️ Erro: Entrega não encontrada na base de dados.");
     }
 }
+
+async function marcarEtiquetaComoEmitida(idEtiqueta) {
+    // 1. Atualiza localmente no navegador se houver lista local
+    let lista = JSON.parse(localStorage.getItem("etiquetas_pendentes")) || [];
+    let atualizado = false;
+    
+    lista.forEach(item => {
+        if (item.id.toString() === idEtiqueta.toString()) {
+            item.status = "EMITIDA";
+            atualizado = true;
+        }
+    });
+    
+    localStorage.setItem("etiquetas_pendentes", JSON.stringify(lista));
+
+    // 2. Envia a atualização para o Google Sheets via URL_API
+    try {
+        if (typeof URL_API !== 'undefined' && URL_API) {
+            await fetch(URL_API, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    acao: "atualizarStatusEtiqueta",
+                    idEtiqueta: idEtiqueta
+                })
+            });
+            console.log("Status da etiqueta atualizado para EMITIDA na nuvem!");
+        }
+    } catch (e) {
+        console.warn("Erro ao atualizar status da etiqueta na nuvem.", e);
+    }
+    
+    // Recarrega a tela do relatório de etiquetas para atualizar a visualização
+    if (typeof abrirRelatorioEtiquetas === "function") {
+        abrirRelatorioEtiquetas();
+    }
+}
