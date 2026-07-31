@@ -230,9 +230,40 @@ function carregarConfigChecklist(input) {
 }
 
 // ==========================================
-// 3. FUNÇÃO DE LOGIN (Atualizada)
+// 3. FUNÇÃO DE LOGIN E ATUALIZAÇÃO DE DADOS
 // ==========================================
-function entrar() {
+
+// Função que vai até a planilha na nuvem e traz a lista atualizada para o celular
+async function atualizarListaDoSetor(setorDoColaborador) {
+    if (!setorDoColaborador) {
+        alert("Nenhum setor/matrícula definido!");
+        return;
+    }
+
+    try {
+        // Pede os dados atualizados direto da nuvem (Planilha Global)
+        let resposta = await fetch(`${URL_API}?acao=obterBaseSetor&setor=${encodeURIComponent(setorDoColaborador)}`);
+        let dadosDaPlanilha = await resposta.json();
+
+        if (dadosDaPlanilha && dadosDaPlanilha.length > 0) {
+            // Salva a lista limpa e atualizada no localStorage do aparelho
+            localStorage.setItem("etiquetas_pendentes", JSON.stringify(dadosDaPlanilha));
+            alert("✅ Lista atualizada com sucesso!\n\nDados sincronizados da planilha.");
+            
+            // Recarrega a tela de etiquetas se ela estiver aberta
+            if (typeof abrirRelatorioEtiquetas === "function") {
+                abrirRelatorioEtiquetas();
+            }
+        } else {
+            alert("⚠️ Nenhum item encontrado na planilha para este setor.");
+        }
+    } catch (erro) {
+        console.error("Erro ao atualizar lista:", erro);
+        alert("⚠️ Não foi possível conectar à nuvem. O app continuará funcionando com os dados locais salvos anteriormente.");
+    }
+}
+
+async function entrar() {
     let campoNome = document.getElementById("nome");
     let campoMatricula = document.getElementById("matricula");
 
@@ -261,11 +292,8 @@ function entrar() {
     localStorage.setItem("usuarioAtual", nome);
     localStorage.setItem("setorAtual", matricula); 
 
-    // Verifica se o celular já tem a lista salva
-    let listaLocal = localStorage.getItem("etiquetas_pendentes");
-    if (!listaLocal) {
-        console.log("Primeiro acesso do colaborador: pronto para carregar os dados.");
-    }
+    // CHAMA A ATUALIZAÇÃO AUTOMÁTICA DA PLANILHA AO ENTRAR
+    await atualizarListaDoSetor(matricula);
 
     voltarMenuPrincipal();
 }
