@@ -230,7 +230,7 @@ function carregarConfigChecklist(input) {
 }
 
 // ==========================================
-// 3. FUNÇÃO DE LOGIN
+// 3. FUNÇÃO DE LOGIN (Atualizada)
 // ==========================================
 function entrar() {
     let campoNome = document.getElementById("nome");
@@ -256,6 +256,17 @@ function entrar() {
     } 
     
     usuarioAtual = nome;
+
+    // Salva o usuário e o setor/matrícula no aparelho
+    localStorage.setItem("usuarioAtual", nome);
+    localStorage.setItem("setorAtual", matricula); 
+
+    // Verifica se o celular já tem a lista salva
+    let listaLocal = localStorage.getItem("etiquetas_pendentes");
+    if (!listaLocal) {
+        console.log("Primeiro acesso do colaborador: pronto para carregar os dados.");
+    }
+
     voltarMenuPrincipal();
 }
 
@@ -273,8 +284,8 @@ function mostrarTelaLoginInicial() {
             <label for="nome">Nome do Colaborador:</label>
             <input type="text" id="nome" placeholder="Digite seu nome completo">
 
-            <label for="matricula">Matrícula / Senha:</label>
-            <input type="password" id="matricula" placeholder="Digite sua matrícula (ou 'admin')">
+            <label for="matricula">Matrícula / Setor:</label>
+            <input type="password" id="matricula" placeholder="Digite sua matrícula ou setor">
 
             <button onclick="entrar()" style="background-color: #28a745; color: white;">Entrar no Sistema</button>
         </div>
