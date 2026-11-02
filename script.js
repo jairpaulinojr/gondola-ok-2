@@ -1,5 +1,9 @@
 // --- CONFIGURAÇÃO DA API ---
-const URL_API = "https://script.google.com/macros/s/AKfycbykcWGN0f38oAR5wwgkuVLaCaBv0baDK4uCODUg3Cf9Fpa3i3-VQAnzdiGpVdfnan99/exec";
+// --- CONFIGURAÇÃO DO SUPABASE ---
+const SUPABASE_URL = "https://jylcmvoynmmyvlpnkkhj.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_q3f4KYC25_TyGmUhY2x5Lg_biiO4j8h";
+
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // --- FUNÇÃO PARA SALVAR NA NUVEM E LOCALMENTE ---
 async function salvarDiaDaGestaoNoHist() {
@@ -3084,3 +3088,4 @@ async function marcarEtiquetaComoEmitida(idEtiqueta) {
         abrirRelatorioEtiquetas();
     }
 }
+
