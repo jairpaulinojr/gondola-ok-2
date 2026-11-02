@@ -75,197 +75,72 @@ let checklistGerencialDoDia = JSON.parse(localStorage.getItem("gondola_checklist
 let respostasChecklistAtual = JSON.parse(localStorage.getItem("gondola_respostas_checklist_atual")) || {};
 let historicoChecklistsSalvos = JSON.parse(localStorage.getItem("gondola_historico_checklists")) || [];
 
-// ==========================================
-// 1.5. FUNÇÃO DE EXPORTAÇÃO (UTILS)
-// ==========================================
-function exportarParaExcel(nomeArquivo, chaveLocalStorage) {
-    let dados = JSON.parse(localStorage.getItem(chaveLocalStorage)) || [];
-    if (dados.length === 0) {
-        alert("Nenhum dado disponível para exportação!");
-        return;
+async function salvarEtiquetaPendente(codigoBarras, descricaoProduto, lojaUser, setorUser) {
+    if (!supabaseClient) {
+        console.error("Cliente Supabase não inicializado.");
+        return false;
     }
 
-    let ws = XLSX.utils.json_to_sheet(dados);
-    let wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Dados");
-    XLSX.writeFile(wb, nomeArquivo + ".xlsx");
-}
-
-// ==========================================
-// 2. PROCESSADOR DE CARGA DE EXCEL POR SETOR
-// ==========================================
-function carregarPlanilhaSetor(inputElement, nomeSetor) {
-    let arquivo = inputElement.files[0];
-    if (!arquivo) return;
-
-    let leitor = new FileReader();
-    leitor.onload = function(evento) {
-        let dados = new Uint8Array(evento.target.result);
-        let arquivoExcel = XLSX.read(dados, {type: 'array'});
-        let json = XLSX.utils.sheet_to_json(arquivoExcel.Sheets[arquivoExcel.SheetNames[0]]);
-        
-        missoesPorSetor[nomeSetor] = json.map((item, idx) => {
-            let codigoEncontrado = item["Cód. de Barras"] || item["codigo"] || item["Código"] || item["Codigo"] || "";
-            let descricaoEncontrada = item["DESCRIÇÃO"] || item["descricao"] || item["Descrição"] || item["Descricao"] || "";
-
-            return {
-                id: Date.now() + idx + Math.random(), 
-                codigo: String(codigoEncontrado).trim(),
-                descricao: String(descricaoEncontrada).trim(),
-                setor: nomeSetor,
-                abastecido: null,
-                precificado: null,
-                statusRuptura: false,
-                finalizacaoGerente: null
-            };
-        }).filter(p => p.codigo !== "" && p.descricao !== "");
-
-        localStorage.setItem("gondola_missoes_setores", JSON.stringify(missoesPorSetor));
-        alert(`Sucesso: ${missoesPorSetor[nomeSetor].length} itens carregados para a Missão de [${nomeSetor}]!`);
-        abrirPainelAdmin(); 
-    };
-    leitor.readAsArrayBuffer(arquivo);
-}
-
-function carregarBaseGlobal(inputElement) {
-    let arquivo = inputElement.files[0];
-    if (!arquivo) return;
-
-    let leitor = new FileReader();
-    leitor.onload = function(evento) {
-        let dados = new Uint8Array(evento.target.result);
-        let arquivoExcel = XLSX.read(dados, {type: 'array'});
-        let json = XLSX.utils.sheet_to_json(arquivoExcel.Sheets[arquivoExcel.SheetNames[0]]);
-        
-        baseGlobalProdutos = json.map(item => {
-            let codigoEncontrado = item["Cód. de Barras"] || item["codigo"] || item["Código"] || item["Codigo"] || "";
-            let descricaoEncontrada = item["DESCRIÇÃO"] || item["descricao"] || item["Descrição"] || item["Descricao"] || "";
-            
-            return {
-                codigo: String(codigoEncontrado).trim(),
-                descricao: String(descricaoEncontrada).trim(),
-                setor: String(item.setor || 'Geral')
-            };
-        }).filter(p => p.codigo !== "" && p.descricao !== "");
-        
-        localStorage.setItem("gondola_base_global", JSON.stringify(baseGlobalProdutos));
-        alert("🔥 Base Global Atualizada! " + baseGlobalProdutos.length + " produtos salvos.");
-        abrirPainelAdmin(); 
-    };
-    leitor.readAsArrayBuffer(arquivo);
-}
-
-// ==========================================
-// 2.5. CARREGAR CONFIGURAÇÃO DO CHECKLIST
-// ==========================================
-function carregarConfigChecklist(input) {
-    if (!input.files || input.files.length === 0) return;
-
-    let file = input.files[0];
-    let reader = new FileReader();
-
-    reader.onload = function (e) {
-        try {
-            let data = new Uint8Array(e.target.result);
-            let workbook = XLSX.read(data, { type: "array" });
-
-            let firstSheetName = workbook.SheetNames[0];
-            let worksheet = workbook.Sheets[firstSheetName];
-
-            let linhas = XLSX.utils.sheet_to_json(worksheet);
-
-            if (linhas.length === 0) {
-                alert("⚠️ A planilha de checklist está vazia!");
-                return;
-            }
-
-            let perguntasFormatadas = [];
-
-            linhas.forEach((linha, index) => {
-
-                let setorNome =
-                    linha["SETOR"] ||
-                    linha["Setor"] ||
-                    linha["setor"] ||
-                    "";
-
-                let perguntaTexto =
-                    linha["PERGUNTA"] ||
-                    linha["Pergunta"] ||
-                    linha["pergunta"] ||
-                    "";
-
-                let ehDiariaRaw =
-                    linha["DIARIA"] ||
-                    linha["Diaria"] ||
-                    linha["DIÁRIA"] ||
-                    linha["diaria"] ||
-                    "NÃO";
-
-                if (setorNome && perguntaTexto) {
-                    perguntasFormatadas.push({
-                        id: Date.now() + index,
-                        setor: String(setorNome).trim(),
-                        pergunta: String(perguntaTexto).trim(),
-                        diaria: String(ehDiariaRaw).trim().toUpperCase() === "SIM"
-                    });
-                }
-
-            });
-
-            localStorage.setItem(
-                "gondola_checklist_config",
-                JSON.stringify(perguntasFormatadas)
-            );
-
-            alert(
-                `✅ Sucesso! ${perguntasFormatadas.length} perguntas de checklist foram importadas.`
-            );
-
-            abrirPainelAdmin();
-
-        } catch (erro) {
-            console.error(erro);
-            alert("❌ Erro ao ler o arquivo Excel.");
-        }
+    const novaEtiqueta = {
+        "codigo de barras": String(codigoBarras).trim(),
+        "descricao": String(descricaoProduto).trim(),
+        "loja": lojaUser,
+        "setor": setorUser,
+        "status": "pendente",
+        "data_criacao": new Date().toISOString()
     };
 
-    reader.readAsArrayBuffer(file);
-}
+    const { data, error } = await supabaseClient
+        .from('etiquetas_pendentes')
+        .insert([novaEtiqueta])
+        .select();
 
-// ==========================================
-// 3. FUNÇÃO DE LOGIN E ATUALIZAÇÃO DE DADOS
-// ==========================================
-
-// Função que vai até a planilha na nuvem e traz a lista atualizada para o celular
-async function atualizarListaDoSetor(setorDoColaborador) {
-    if (!setorDoColaborador) {
-        alert("Nenhum setor/matrícula definido!");
-        return;
+    if (error) {
+        console.error("Erro ao salvar etiqueta pendente:", error.message);
+        alert("Erro ao enviar etiqueta para o Supabase.");
+        return false;
     }
 
-    try {
-        // Pede os dados atualizados direto da nuvem (Planilha Global)
-        let resposta = await fetch(`${URL_API}?acao=obterBaseSetor&setor=${encodeURIComponent(setorDoColaborador)}`);
-        let dadosDaPlanilha = await resposta.json();
-
-        if (dadosDaPlanilha && dadosDaPlanilha.length > 0) {
-            // Salva a lista limpa e atualizada no localStorage do aparelho
-            localStorage.setItem("etiquetas_pendentes", JSON.stringify(dadosDaPlanilha));
-            alert("✅ Lista atualizada com sucesso!\n\nDados sincronizados da planilha.");
-            
-            // Recarrega a tela de etiquetas se ela estiver aberta
-            if (typeof abrirRelatorioEtiquetas === "function") {
-                abrirRelatorioEtiquetas();
-            }
-        } else {
-            alert("⚠️ Nenhum item encontrado na planilha para este setor.");
-        }
-    } catch (erro) {
-        console.error("Erro ao atualizar lista:", erro);
-        alert("⚠️ Não foi possível conectar à nuvem. O app continuará funcionando com os dados locais salvos anteriormente.");
-    }
+    console.log("Etiqueta pendente salva com sucesso!", data);
+    return true;
 }
+
+async function salvarRegistroValidade(codigoBarras, descricaoProduto, dataValidade, quantidadeItem, lojaUser, setorUser) {
+    if (!supabaseClient) {
+        console.error("Cliente Supabase não inicializado.");
+        return false;
+    }
+
+    const registroValidade = {
+        "codigo de barras": String(codigoBarras).trim(),
+        "descricao": String(descricaoProduto).trim(),
+        "validade": dataValidade,
+        "quantidade": Number(quantidadeItem),
+        "loja": lojaUser,
+        "setor": setorUser,
+        "usuario": usuarioAtual || "Operador",
+        "data_registro": new Date().toISOString()
+    };
+
+    const { data, error } = await supabaseClient
+        .from('validade')
+        .insert([registroValidade])
+        .select();
+
+    if (error) {
+        console.error("Erro ao salvar validade:", error.message);
+        alert("Erro ao registrar validade no Supabase.");
+        return false;
+    }
+
+    console.log("Validade salva com sucesso!", data);
+    alert("Registro de validade enviado com sucesso para a nuvem!");
+    return true;
+}
+
+// ==========================================
+// 3. FUNÇÃO DE LOGIN E CONSULTA NO SUPABASE
+// ==========================================
 
 async function entrar() {
     let campoNome = document.getElementById("nome");
@@ -292,14 +167,44 @@ async function entrar() {
     
     usuarioAtual = nome;
 
-    // Salva o usuário e o setor/matrícula no aparelho
+    // Salva o usuário e o setor/matrícula no aparelho (memória temporária)
     localStorage.setItem("usuarioAtual", nome);
     localStorage.setItem("setorAtual", matricula); 
 
-    // CHAMA A ATUALIZAÇÃO AUTOMÁTICA DA PLANILHA AO ENTRAR
-    await atualizarListaDoSetor(matricula);
+    // Consulta os dados do setor diretamente no Supabase
+    await carregarDadosSetorSupabase(matricula);
 
     voltarMenuPrincipal();
+}
+
+// Função para buscar dados da tabela centralizada no Supabase filtrados por setor/loja
+async function carregarDadosSetorSupabase(setorDoColaborador) {
+    if (!supabaseClient) {
+        console.error("Cliente Supabase não inicializado.");
+        return;
+    }
+
+    try {
+        let { data, error } = await supabaseClient
+            .from('cadastro_global') // ou a tabela correspondente às missões/etiquetas
+            .select('*')
+            .eq('setor', setorDoColaborador);
+
+        if (error) {
+            console.error("Erro ao carregar dados do Supabase:", error.message);
+            return;
+        }
+
+        if (data && data.length > 0) {
+            // Salva o cache temporário local apenas para operação offline se necessário
+            localStorage.setItem("etiquetas_pendentes", JSON.stringify(data));
+            console.log("✅ Dados sincronizados do Supabase com sucesso!");
+        } else {
+            console.log("⚠️ Nenhum registro encontrado para este setor no Supabase.");
+        }
+    } catch (err) {
+        console.error("Erro de conexão com o Supabase:", err);
+    }
 }
 
 function mostrarTelaLoginInicial() {
@@ -325,191 +230,7 @@ function mostrarTelaLoginInicial() {
 }
 
 // ==========================================================
-// 4. TELA DO ADMINISTRADOR (PAINEL DE GESTÃO) - COM GAVETA RETRÁTIL
-// ==========================================================
-function abrirPainelAdmin() {
-    let registros = JSON.parse(localStorage.getItem("registro_validades")) || [];
-    let hoje = new Date();
-    
-    let vencendoLogo = registros.filter(r => {
-        if (r.status === "Resolvido") return false;
-        if (!r.dataValidade) return false;
-        
-        let [d, m, a] = r.dataValidade.split('/');
-        let dataVenc = new Date(a, m - 1, d);
-        let diferencaDias = Math.ceil((dataVenc - hoje) / (1000 * 60 * 60 * 24));
-        
-        return diferencaDias >= 0 && diferencaDias <= 15;
-    });
-
-    let avisoHtml = "";
-    if (vencendoLogo.length > 0) {
-        avisoHtml = `
-            <div style="background:#dc3545; color:white; padding:15px; margin-bottom:15px; border-radius:5px; text-align:center; font-weight:bold; border: 1px solid #a71d2a;">
-                🚨 ATENÇÃO: ${vencendoLogo.length} item(ns) vencendo em até 15 dias!
-            </div>
-        `;
-    }
-
-    let setoresLista = [
-        { nome: 'Mercearia Bebidas', icone: '🥤' }, { nome: 'Mercearia Doce', icone: '🍬' },
-        { nome: 'Mercearia Conservas', icone: '🥫' }, { nome: 'Mercearia Alto Giro', icone: '🔄' },
-        { nome: 'Mercearia Limpeza', icone: '🧴' }, { nome: 'Frios Iogurte', icone: '🥛' },
-        { nome: 'Frios Congelados', icone: '🧊' }, { nome: 'Açougue', icone: '🥩' },
-        { nome: 'Padaria', icone: '🍞' }
-    ];
-
-    let blocosInputsSetores = "";
-    setoresLista.forEach(s => {
-        let contagem = 0;
-        try {
-            if (typeof missoesPorSetor !== 'undefined' && missoesPorSetor[s.nome]) {
-                contagem = missoesPorSetor[s.nome].length;
-            }
-        } catch(e) {
-            contagem = 0;
-        }
-
-        blocosInputsSetores += `
-            <div style="margin-bottom: 12px; border-bottom: 1px solid #f0f0f0; padding-bottom: 8px;">
-                <label><strong>${s.icone} ${s.nome}</strong> (${contagem} itens)</label>
-                <input type="file" onchange="carregarPlanilhaSetor(this, '${s.nome}')" style="width: 100%; font-size: 11px;">
-            </div>
-        `;
-    });
-
-    let blocoBaseGlobal = `
-        <div style="margin-top: 15px; padding: 10px; background: #fff3cd; border: 1px dashed #ffc107; border-radius: 5px;">
-            <label style="font-weight: bold; color: #856404;">🔥 ATUALIZAR BASE GLOBAL</label>
-            <input type="file" onchange="carregarBaseGlobal(this)" style="width: 100%; font-size: 11px; margin-top: 5px;">
-        </div>
-    `;
-
-    let blocoChecklist = `
-        <div style="margin-top:15px; padding:10px; background:#d1ecf1; border:1px dashed #0c5460; border-radius:5px;">
-            <label style="font-weight:bold; color:#0c5460;">📋 ATUALIZAR CONFIGURAÇÃO DE CHECKLISTS</label>
-            <input type="file" onchange="carregarConfigChecklist(this)" style="width:100%; font-size:11px; margin-top: 5px;">
-        </div>
-    `;
-
-    let blocoRotasEntrega = `
-        <div style="margin-top:15px; padding:10px; background:#e2f0d9; border:1px dashed #385723; border-radius:5px;">
-            <label style="font-weight:bold; color:#385723;">🚚 ATUALIZAR PLANILHA DE ROTAS (CSV)</label>
-            <input type="file" onchange="processarArquivoCSVRotas(this)" style="width:100%; font-size:11px; margin-top: 5px;">
-        </div>
-    `;
-
-    // MONTAGEM DO CORPO DO RELATÓRIO DE ENTREGAS
-    let relatorioEntregasHtml = "";
-    try {
-        let entregas = JSON.parse(localStorage.getItem("registro_entregas")) || [];
-        let total = entregas.length;
-        let pendentes = entregas.filter(e => e.status === "Pendente").length;
-        let entregues = entregas.filter(e => e.status === "Entregue").length;
-        let problemas = entregas.filter(e => e.status === "Não Recebida" || e.status === "Não Localizada").length;
-
-        relatorioEntregasHtml = `
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 10px; text-align: center; font-size:12px;">
-                <div style="background:#f8f9fa; padding:5px; border-radius:4px; border:1px solid #ddd;">Total<br><strong>${total}</strong></div>
-                <div style="background:#e6f2ff; padding:5px; border-radius:4px; border:1px solid #b6d4fe; color:#004085;">Pend.<br><strong>${pendentes}</strong></div>
-                <div style="background:#d1e7dd; padding:5px; border-radius:4px; border:1px solid #badbcc; color:#0f5132;">Ok<br><strong>${entregues}</strong></div>
-                <div style="background:#f8d7da; padding:5px; border-radius:4px; border:1px solid #f5c2c7; color:#842029;">Erro<br><strong>${problemas}</strong></div>
-            </div>
-            <div style="max-height: 200px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; background: white;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left;">
-                    <thead>
-                        <tr style="background: #efefef; color: #333; position: sticky; top: 0;">
-                            <th style="padding: 6px;">Cliente</th>
-                            <th style="padding: 6px;">Rota/Bairro</th>
-                            <th style="padding: 6px; text-align:center;">Vol.</th>
-                            <th style="padding: 6px; text-align:center;">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${total === 0 ? `<tr><td colspan="4" style="padding:10px; text-align:center; color:#999;">Nenhuma entrega lançada.</td></tr>` : ""}
-                        ${entregas.map(e => {
-                            let cStatus = "#ffc107";
-                            if (e.status === "Entregue") cStatus = "#28a745";
-                            if (e.status === "Não Recebida" || e.status === "Não Localizada") cStatus = "#dc3545";
-                            
-                            // Correção para evitar exibir 'undefined' caso a propriedade varie de nome
-                            let rotaNome = e.rota || e.ROTA || "1";
-
-                            return `
-                                <tr style="border-bottom: 1px solid #f9f9f9;">
-                                    <td style="padding: 6px;"><b>${e.cliente}</b><br><span style="color:#777; font-size:10px;">${e.rua}, ${e.numero}</span></td>
-                                    <td style="padding: 6px;">R. ${rotaNome}<br><span style="color:#777; font-size:10px;">${e.bairro}</span></td>
-                                    <td style="padding: 6px; text-align:center;">${e.caixas}</td>
-                                    <td style="padding: 6px; text-align:center;"><span style="background:${cStatus}; color:white; padding:2px 4px; border-radius:3px; font-weight:bold; font-size:9px;">${e.status}</span></td>
-                                </tr>
-                            `;
-                        }).join("")}
-                    </tbody>
-                </table>
-            </div>
-            ${total > 0 ? `
-                <div style="text-align:right; margin-top:5px;">
-                    <span onclick="if(confirm('Limpar registros de hoje?')){localStorage.removeItem('registro_entregas'); abrirPainelAdmin();}" style="color:#dc3545; font-size:10px; cursor:pointer; text-decoration:underline;">🗑️ Limpar Entregas</span>
-                </div>
-            ` : ""}
-        `;
-    } catch(err) {
-        relatorioEntregasHtml = "<p style='color:red; font-size:11px;'>Erro ao carregar dados de entrega.</p>";
-    }
-
-    let container = document.querySelector(".container");
-    if (container) {
-        container.innerHTML = `
-            ${avisoHtml}
-            <div class="topo"><h1>⚙️ PAINEL DO ADMINISTRADOR</h1></div>
-            <div class="login" style="text-align: left; max-width: 100%;">
-                
-                <h3 style="margin-top:0; border-bottom:1px solid #ccc; padding-bottom:5px;">Auditorias de Gôndola (20 Itens)</h3>
-                <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
-                    <button onclick="abrirMenuSetoresGerente()" style="background:#17a2b8; color:white; flex: 1; min-width: 120px;">🚨 Fila de Rupturas</button>
-                    <button onclick="abrirHistoricoMissoesGerente()" style="background:#007bff; color:white; flex: 1; min-width: 120px; font-weight:bold;">📊 Histórico de Missões</button>
-                    <button onclick="abrirHistoricoTratativasGerente()" style="background:#28a745; color:white; flex: 1; min-width: 120px; font-weight:bold;">📋 Histórico de Tratativas</button>
-                </div>
-
-                <h3 style="margin-top:15px; border-bottom:1px solid #ccc; padding-bottom:5px;">Checklists Operacionais</h3>
-                <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
-                    <button id="btn-responder-checklist" style="background:#6f42c1; color:white; flex: 1; min-width: 120px;">📋 Responder Checklist</button>
-                    <button id="btn-historico-checklist" style="background:#fd7e14; color:white; flex: 1; min-width: 120px; font-weight: bold;">📊 Histórico Checklist</button>
-                </div>
-                
-                <h3 style="margin-top:15px; border-bottom:1px solid #ccc; padding-bottom:5px;">Validades</h3>
-                <button onclick="abrirRelatorioValidadesGerente()" style="background:#20c997; color:white; width:100%; margin-bottom:15px;">📅 Controlar Vencimentos</button>
-                
-                <!-- NOVO: BOTÃO DA GAVETA DE ENTREGAS -->
-                <button onclick="alternarVisibilidadeEntregas()" id="btn-toggle-entregas" style="background:#0275d8; color:white; width:100%; margin-bottom:15px; font-weight:bold;">📊 Monitoramento de Entregas (Abrir)</button>
-                
-                <!-- GAVETA DE ENTREGAS (INICIA ESCONDIDA) -->
-                <div id="container-entregas-monitor" style="display: none; background: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; border-radius: 5px; margin-bottom:15px;">
-                    ${relatorioEntregasHtml}
-                </div>
-                
-                <button onclick="alternarVisibilidadeFicheiros()" id="btn-toggle-ficheiros" style="background:#495057; color:white; width:100%; margin: 15px 0;">📂 Importar Planilhas / Ficheiros (Abrir)</button>
-                
-                <div id="container-ficheiros-upload" style="display: none; background: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; border-radius: 5px;">
-                    ${blocosInputsSetores}
-                    ${blocoBaseGlobal}
-                    ${blocoChecklist}
-                    ${blocoRotasEntrega}
-                </div>
-
-                <button onclick="mostrarTelaLoginInicial()" style="background:#6c757d; color:white; width: 100%; margin-top: 20px;">Voltar ao Menu Principal</button>
-            </div>
-        `;
-
-        document.getElementById("btn-responder-checklist").addEventListener("click", abrirMenuChecklistsGerente);
-        document.getElementById("btn-historico-checklist").addEventListener("click", function() {
-            abrirHistoricoChecklistsGerente();
-        });
-    }
-}
-
-// ==========================================================
-// FUNÇÃO PARA RECOLHER / MOSTRAR O MONITOR DE ENTREGAS
+// FUNÇÕES UTILITÁRIAS DE INTERFACE
 // ==========================================================
 function alternarVisibilidadeEntregas() {
     let painel = document.getElementById("container-entregas-monitor");
@@ -526,9 +247,6 @@ function alternarVisibilidadeEntregas() {
     }
 }
 
-mostrarTelaLoginInicial();
-// 4.5. MOSTRAR / OCULTAR PAINEL DE IMPORTAÇÃO
-// ==========================================
 function alternarVisibilidadeFicheiros() {
     let painel = document.getElementById("container-ficheiros-upload");
     let botao = document.getElementById("btn-toggle-ficheiros");
@@ -543,6 +261,7 @@ function alternarVisibilidadeFicheiros() {
         botao.innerHTML = "📂 Importar Planilhas / Ficheiros (Abrir)";
     }
 }
+
 // ==========================================
 // 5. MENU PRINCIPAL DO REPOSITOR (USUÁRIO)
 // ==========================================
@@ -587,11 +306,7 @@ function voltarMenuPrincipal() {
             <h2>Serviços de Apoio</h2>
 
             <button onclick="abrirAbaValidade()" style="background:#20c997; color:white;">
-                📅 Verificar Validade (Base Global)
-            </button>
-
-            <button onclick="abrirColetorEtiquetas()" style="background:#f0ad4e; color:white; margin-top:10px;">
-                🏷️ Coletor de Etiquetas Avulso
+                📅 Verificar Validade (Supabase)
             </button>
 
             <button onclick="abrirAbaEtiquetas()" style="background:#ffc107; color:black; margin-top:10px;">
@@ -606,9 +321,9 @@ function voltarMenuPrincipal() {
                 📦 Lançar Novas Entregas (Fiscal)
             </button>
 
-          <button onclick="abrirAbaMotoristaEntrega()" style="background:#5cb85c; color:white; margin-top:10px; width:100%;">
-    🛣️ Entregas para Fazer (Motorista)
-</button>
+            <button onclick="abrirAbaMotoristaEntrega()" style="background:#5cb85c; color:white; margin-top:10px; width:100%;">
+                🛣️ Entregas para Fazer (Motorista)
+            </button>
 
             <button onclick="mostrarTelaLoginInicial()" style="background:#6c757d; color:white; margin-top:20px;">
                 ⬅️ Sair do App
@@ -620,14 +335,24 @@ function voltarMenuPrincipal() {
 // ==========================================
 // 6. SORTEIO ALEATÓRIO DA MISSÃO (MÁX 20 ITENS)
 // ==========================================
-function prepararMissaoSetor(setor) {
+async function prepararMissaoSetor(setor) {
     setorSelecionado = setor;
     indiceAtual = 0;
 
+    // Tenta carregar missões do cache ou busca do Supabase
     let todosDoSetor = missoesPorSetor[setor] || [];
 
+    if (todosDoSetor.length === 0 && supabaseClient) {
+        let { data } = await supabaseClient
+            .from('cadastro_global')
+            .select('*')
+            .eq('setor', setor);
+        
+        if (data) todosDoSetor = data;
+    }
+
     if (todosDoSetor.length === 0) {
-        alert("Atenção: Nenhuma lista de missão foi carregada para o setor: " + setor);
+        alert("Atenção: Nenhuma lista de missão encontrada para o setor: " + setor);
         return;
     }
 
@@ -646,7 +371,6 @@ function prepararMissaoSetor(setor) {
 // 7. CHECKLIST INTERATIVO DE LOJA
 // ==========================================
 function mostrarProdutoAtual() {
-
     let container = document.querySelector(".container");
     if (!container) return;
 
@@ -664,8 +388,8 @@ function mostrarProdutoAtual() {
     </div>
 
     <div class="login">
-        <p><strong>Código:</strong> ${produto.codigo}</p>
-        <p><strong>Produto:</strong> ${produto.descricao}</p>
+        <p><strong>Código:</strong> ${produto['codigo de barras'] || produto.codigo || '-'}</p>
+        <p><strong>Produto:</strong> ${produto.descricao || produto.PRODUTO || '-'}</p>
         <br>
 
         <h3>O produto está abastecido?</h3>
@@ -745,9 +469,6 @@ function proximoProduto() {
     mostrarProdutoAtual();
 }
 
-// ==========================================
-// 7.5. NOVA TELA: VALIDAÇÃO DA MISSÃO
-// ==========================================
 function mostrarTelaValidacaoMissao() {
     let total = produtosDoDia.length;
     let abastecidos = produtosDoDia.filter(p => p.abastecido === true).length;
@@ -761,7 +482,6 @@ function mostrarTelaValidacaoMissao() {
         </div>
 
         <div class="login" style="max-width:100%; text-align:left;">
-
             <div style="background:#e9ecef;padding:12px;border-radius:5px;margin-bottom:15px;font-size:14px;line-height:1.6;">
                 📊 <strong>Resumo dos Itens Verificados:</strong><br>
                 📦 Total: <strong>${total}</strong><br>
@@ -771,7 +491,7 @@ function mostrarTelaValidacaoMissao() {
             </div>
 
             <p style="font-size:12px;color:#6c757d;text-align:center;margin-bottom:15px;">
-                ⚠️ Confira as informações antes de gravar.
+                ⚠️ Confira as informações antes de gravar no Supabase.
             </p>
 
             <div style="display:flex;gap:10px;">
@@ -783,44 +503,27 @@ function mostrarTelaValidacaoMissao() {
                     ❌ Cancelar
                 </button>
             </div>
-
         </div>
     `;
 }
 
 // ==========================================
-// 8. FINALIZAÇÃO E GRAVAÇÃO REAL DA MISSÃO DIÁRIA
+// 8. FINALIZAÇÃO E GRAVAÇÃO NO SUPABASE
 // ==========================================
-function finalizarEGravarMissao() {
-    let historico = JSON.parse(localStorage.getItem("gondola_dados")) || [];
-    let dataAtual = new Date().toLocaleDateString();
-    let horaAtual = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    let idSessaoMissao = Date.now();
+async function finalizarEGravarMissao() {
+    if (!supabaseClient) {
+        alert("Erro de conexão com o banco de dados.");
+        return;
+    }
 
-    let etiquetasPendenteLocal = JSON.parse(localStorage.getItem("etiquetas_pendentes")) || [];
-    
-    let produtosMapeados = produtosDoDia.map(p => {
+    // Processa etiquetas pendentes para os produtos sem preço
+    for (let p of produtosDoDia) {
         if (p.precificado === false) {
-            if (!etiquetasPendenteLocal.some(e => e.codigo === p.codigo)) {
-                etiquetasPendenteLocal.push(p);
-            }
+            let cod = p['codigo de barras'] || p.codigo;
+            let desc = p.descricao || p.PRODUTO;
+            await salvarEtiquetaPendente(cod, desc, localStorage.getItem("lojaAtual") || "Geral", setorSelecionado);
         }
-        
-        return {
-            ...p,
-            id: Date.now() + Math.random(), 
-            idSessaoMissao: idSessaoMissao,
-            operador: usuarioAtual,
-            dataAuditoria: dataAtual,
-            horaAuditoria: horaAtual,
-            tratadoRuptura: false 
-        };
-    });
-
-    localStorage.setItem("etiquetas_pendentes", JSON.stringify(etiquetasPendenteLocal));
-
-    historico = historico.concat(produtosMapeados);
-    localStorage.setItem("gondola_dados", JSON.stringify(historico));
+    }
 
     document.querySelector(".container").innerHTML = `
         <div class="topo">
@@ -828,20 +531,18 @@ function finalizarEGravarMissao() {
             <h2>Missão Gravada!</h2>
         </div>
         <div class="login" style="text-align: center;">
-            <p style="color:green; font-weight:bold; font-size:16px;">🎉 Auditoria dos 20 itens processada com sucesso no sistema!</p>
+            <p style="color:green; font-weight:bold; font-size:16px;">🎉 Auditoria enviada diretamente ao Supabase com sucesso!</p>
             <button onclick="voltarMenuPrincipal()" style="background-color: #6c757d; color: white; width:100%; padding:10px; margin-top:10px;">Voltar ao Menu</button>
         </div>
     `;
 }
 
-// Variable global para controlar o leitor da câmera e evitar travamentos
 let scannerValidade = null;
 
 // ==========================================
-// 9. REPOSITOR: ABA VALIDADE (PRODUTOS)
+// 9. REPOSITOR: ABA VALIDADE (SUPABASE)
 // ==========================================
 function abrirAbaValidade() {
-    // Se houver alguma câmera aberta anteriormente, encerra para liberar o hardware
     if (scannerValidade) {
         try { scannerValidade.clear(); } catch(e) {}
         scannerValidade = null;
@@ -852,8 +553,6 @@ function abrirAbaValidade() {
             <h1>📅 VERIFICAÇÃO DE VALIDADE</h1>
         </div>
         <div class="login" style="max-width:100%;">
-            
-            <!-- ÁREA DA CÂMERA AO VIVO (LEITURA EM TEMPO REAL) -->
             <div id="leitor-camera" style="width: 100%; max-width: 350px; margin: 0 auto;"></div>
             <br>
             
@@ -866,7 +565,6 @@ function abrirAbaValidade() {
         </div>
     `;
 
-    // Inicia a câmera em tempo real para ler o código de barras automaticamente
     setTimeout(() => {
         try {
             scannerValidade = new Html5QrcodeScanner("leitor-camera", { 
@@ -875,20 +573,13 @@ function abrirAbaValidade() {
             });
 
             scannerValidade.render((codigoLido) => {
-                // ASSIM QUE A CÂMERA RECONHECER O CÓDIGO DE BARRAS:
                 document.getElementById("input-manual-code").value = codigoLido;
-                
-                // Fecha a câmera para economizar bateria/processamento
                 try { scannerValidade.clear(); } catch(e) {}
                 scannerValidade = null;
-                
-                // Dispara a busca do produto automaticamente
                 buscarProdutoValidade(codigoLido);
-            }, (erro) => {
-                // Busca contínua da câmera (erros normais de enquadramento são ignorados)
-            });
+            }, (erro) => {});
         } catch (err) {
-            console.error("Erro ao abrir a câmera ao vivo:", err);
+            console.error("Erro ao abrir a câmera:", err);
         }
     }, 200);
 }
@@ -911,112 +602,96 @@ async function buscarProdutoValidade(codigoBarras) {
         return;
     }
 
-    display.innerHTML = `<p style="text-align:center; color:#6c757d;">🔍 Buscando produto na planilha...</p>`;
+    display.innerHTML = `<p style="text-align:center; color:#6c757d;">🔍 Buscando produto no Supabase...</p>`;
 
-    try {
-        let resposta = await fetch(`${URL_API_GAS}?acao=buscarProduto&codigo=${codigoLimpo}`);
-        let resultado = await resposta.json();
+    // Consulta no Supabase via função do cadastro global
+    let produtos = await buscarProdutoCadastroGlobal(codigoLimpo);
 
-        if (!resultado || !resultado.encontrado) {
-            display.innerHTML = `<p style="color:red; text-align:center;">❌ Produto não localizado no Cadastro Geral da Planilha.</p>`;
-            return;
-        }
+    if (!produtos || produtos.length === 0) {
+        display.innerHTML = `<p style="color:red; text-align:center;">❌ Produto não localizado no Cadastro Global do Supabase.</p>`;
+        return;
+    }
 
-        let produtoEncontrado = resultado.produto;
+    let produtoEncontrado = produtos[0];
+    let nomeProduto = produtoEncontrado.PRODUTO || produtoEncontrado.descricao || "Produto Sem Nome";
+    let codProduto = produtoEncontrado['CODIGO DE BARRAS'] || produtoEncontrado.codigo || codigoLimpo;
 
-        display.innerHTML = `
-            <p><strong>Produto:</strong> ${produtoEncontrado.descricao}</p>
-            <p><strong>Código:</strong> ${produtoEncontrado.codigo}</p>
-            <label><strong>Data de Vencimento:</strong></label>
-            <input type="date" id="data-venc" style="width:100%; padding:8px; margin: 10px 0;">
-            <label><strong>Quantidade:</strong></label>
-            <input type="number" id="qtd-venc" value="1" style="width:100%; padding:8px; margin: 10px 0;">
-            <button onclick="salvarDataValidade('${produtoEncontrado.codigo}', '${produtoEncontrado.descricao.replace(/'/g, "\\'")}')" style="background:#28a745; color:white; width:100%; padding:10px; border:none; border-radius:5px; font-weight:bold; cursor:pointer;">Salvar Data e Qtd</button>
-        `;
-    } catch (e) {
-        let baseMestre = JSON.parse(localStorage.getItem("gondola_base_global")) || [];
-        let produtoEncontrado = baseMestre.find(p => p.codigo === codigoLimpo);
+    display.innerHTML = `
+        <p><strong>Produto:</strong> ${nomeProduto}</p>
+        <p><strong>Código:</strong> ${codProduto}</p>
+        <label><strong>Data de Vencimento:</strong></label>
+        <input type="date" id="data-venc" style="width:100%; padding:8px; margin: 10px 0;">
+        <label><strong>Quantidade:</strong></label>
+        <input type="number" id="qtd-venc" value="1" style="width:100%; padding:8px; margin: 10px 0;">
+        <button onclick="confirmarValidadeSupabase('${codProduto}', '${nomeProduto.replace(/'/g, "\\'")}')" style="background:#28a745; color:white; width:100%; padding:10px; border:none; border-radius:5px; font-weight:bold; cursor:pointer;">Salvar Data e Qtd</button>
+    `;
+}
 
-        if (!produtoEncontrado) {
-            display.innerHTML = `<p style="color:red; text-align:center;">❌ Erro ao consultar a planilha e produto não encontrado localmente.</p>`;
-            return;
-        }
+async function confirmarValidadeSupabase(codigo, descricao) {
+    let dataVal = document.getElementById("data-venc").value;
+    let qtdVal = document.getElementById("qtd-venc").value;
 
-        display.innerHTML = `
-            <p><strong>Produto:</strong> ${produtoEncontrado.descricao}</p>
-            <p><strong>Código:</strong> ${produtoEncontrado.codigo}</p>
-            <label><strong>Data de Vencimento:</strong></label>
-            <input type="date" id="data-venc" style="width:100%; padding:8px; margin: 10px 0;">
-            <label><strong>Quantidade:</strong></label>
-            <input type="number" id="qtd-venc" value="1" style="width:100%; padding:8px; margin: 10px 0;">
-            <button onclick="salvarDataValidade('${produtoEncontrado.codigo}', '${produtoEncontrado.descricao.replace(/'/g, "\\'")}')" style="background:#28a745; color:white; width:100%; padding:10px; border:none; border-radius:5px; font-weight:bold; cursor:pointer;">Salvar Data e Qtd</button>
-        `;
+    if (!dataVal) { 
+        alert("Escolha uma data de vencimento!"); 
+        return; 
+    }
+
+    let partes = dataVal.split("-");
+    let dataFormatada = `${partes[2]}/${partes[1]}/${partes[0]}`;
+
+    let loja = localStorage.getItem("lojaAtual") || "Geral";
+    let setor = setorSelecionado || localStorage.getItem("setorAtual") || "Geral";
+
+    let sucesso = await salvarRegistroValidade(codigo, descricao, dataFormatada, qtdVal, loja, setor);
+    
+    if (sucesso) {
+        abrirAbaValidade();
     }
 }
 
-function salvarDataValidade(codigo, descricao) {
-    let data = document.getElementById("data-venc").value;
-    let qtd = document.getElementById("qtd-venc").value;
-    if(!data) { alert("Escolha uma data!"); return; }
-    
-    let registros = JSON.parse(localStorage.getItem("registro_validades")) || [];
-    let partes = data.split("-");
-    let dataFormatada = `${partes[2]}/${partes[1]}/${partes[0]}`;
-
-    registros.push({ 
-        codigo: codigo, 
-        descricao: descricao,
-        dataValidade: dataFormatada,
-        quantidade: qtd, 
-        status: "Pendente", 
-        dataRegistro: new Date().toLocaleDateString() 
-    });
-    localStorage.setItem("registro_validades", JSON.stringify(registros));
-    
-    alert("Salvo com sucesso! Quantidade: " + qtd);
-    abrirAbaValidade(); 
-}
-
 // ==========================================
-// 10. REPOSITOR: ABA PREÇOS (MANUAL) - NUVEM / GOOGLE SHEETS
+// 10. REPOSITOR: ABA PREÇOS / ETIQUETAS (SUPABASE)
 // ==========================================
 async function abrirAbaEtiquetas() {
     document.querySelector(".container").innerHTML = `
         <div class="topo">
             <h1>🏷️ PRODUTOS SEM PREÇO</h1>
-            <p>Carregando dados da nuvem...</p>
+            <p>Carregando dados do Supabase...</p>
         </div>
         <div class="login" style="max-width:100%; text-align:center; padding: 20px;">
-            <p style="color:#6c757d;">⏳ Sincronizando com a planilha...</p>
+            <p style="color:#6c757d;">⏳ Sincronizando com o banco de dados...</p>
         </div>
     `;
 
     let etiquetas = [];
-    try {
-        let resposta = await fetch(`${URL_API_GAS}?acao=listarEtiquetas`);
-        let resultado = await resposta.json();
-        if (resultado && resultado.etiquetas) {
-            etiquetas = resultado.etiquetas;
+    if (supabaseClient) {
+        let { data, error } = await supabaseClient
+            .from('etiquetas_pendentes')
+            .select('*');
+
+        if (!error && data) {
+            etiquetas = data;
         }
-    } catch (e) {
-        etiquetas = JSON.parse(localStorage.getItem("etiquetas_pendentes")) || [];
     }
 
     let lines = "";
     if (etiquetas.length === 0) {
         lines = `<tr><td colspan="2" style="text-align:center; padding:20px; color: green; font-weight: bold;">🎉 Nenhum produto sem preço pendente!</td></tr>`;
     } else {
-        etiquetas.forEach((e, idx) => {
+        etiquetas.forEach((e) => {
+            let desc = e.descricao || e.PRODUTO || "Produto";
+            let cod = e["codigo de barras"] || e.codigo || "-";
+
             lines += `
                 <tr style="border-bottom: 1px solid #ddd;">
                     <td style="padding:12px; font-size:14px; line-height: 1.4;">
-                        <strong>${e.descricao}</strong><br>
+                        <strong>${desc}</strong><br>
                         <span style="font-family: monospace; font-size: 15px; color: #333; background: #eee; padding: 2px 6px; border-radius: 3px;">
-                            ${e.codigo}
+                            ${cod}
                         </span>
                     </td>
                     <td style="padding:12px; text-align:center; width: 90px;">
-                        <button onclick="darBaixaEtiquetaNuvem('${e.codigo}')" style="background:#28a745; color:white; padding:8px 10px; font-size:12px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">
+                        <button onclick="darBaixaEtiquetaSupabase('${cod}')" style="background:#28a745; color:white; padding:8px 10px; font-size:12px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">
                             ✓ Feito
                         </button>
                     </td>
@@ -1028,11 +703,11 @@ async function abrirAbaEtiquetas() {
     document.querySelector(".container").innerHTML = `
         <div class="topo">
             <h1>🏷️ PRODUTOS SEM PREÇO</h1>
-            <p>Sincronizado com a Planilha Geral</p>
+            <p>Sincronizado com o Supabase</p>
         </div>
         <div class="login" style="max-width:100%; padding: 0;">
             <div style="background: #e2e3e5; padding: 10px; border-radius: 5px; margin-bottom: 15px; font-size: 13px; color: #383d41; text-align: center;">
-                📋 <strong>Total pendente na nuvem: ${etiquetas.length} itens</strong>
+                📋 <strong>Total pendente: ${etiquetas.length} itens</strong>
             </div>
             
             <table style="width:100%; border-collapse:collapse; text-align:left; background: white;">
@@ -1050,27 +725,24 @@ async function abrirAbaEtiquetas() {
     `;
 }
 
-async function darBaixaEtiquetaNuvem(codigoProduto) {
+async function darBaixaEtiquetaSupabase(codigoProduto) {
     if (!confirm("Deseja realmente dar baixa nesta etiqueta?")) return;
 
-    document.querySelector(".container").innerHTML = `
-        <div class="topo">
-            <h1>🏷️ PRODUTOS SEM PREÇO</h1>
-            <p>Atualizando na nuvem...</p>
-        </div>
-        <div class="login" style="max-width:100%; text-align:center; padding: 20px;">
-            <p style="color:#6c757d;">⏳ Salvando alteração na planilha...</p>
-        </div>
-    `;
+    if (!supabaseClient) {
+        alert("Erro de conexão.");
+        return;
+    }
 
-    try {
-        await fetch(`${URL_API_GAS}?acao=darBaixaEtiqueta&codigo=${codigoProduto}`, {
-            method: 'POST'
-        });
-    } catch (e) {
-        let etiquetas = JSON.parse(localStorage.getItem("etiquetas_pendentes")) || [];
-        etiquetas = etiquetas.filter(e => e.codigo !== codigoProduto);
-        localStorage.setItem("etiquetas_pendentes", JSON.stringify(etiquetas));
+    let { error } = await supabaseClient
+        .from('etiquetas_pendentes')
+        .delete()
+        .eq('codigo de barras', codigoProduto);
+
+    if (error) {
+        console.error("Erro ao remover etiqueta:", error.message);
+        alert("Não foi possível dar baixa na etiqueta.");
+    } else {
+        alert("Baixa realizada com sucesso!");
     }
 
     abrirAbaEtiquetas();
@@ -1921,13 +1593,13 @@ window.verDetalhesChecklist = async function(idSessao) {
 };
 
 // ==========================================================
-// FUNÇÃO ACIONADA PELO BOTÃO DA TELA DE GESTÃO (CICLO EVOLUTIVO DE 6 DIAS) - NUVEM / GOOGLE SHEETS
+// FUNÇÕES DO CICLO EVOLUTIVO DE CHECKLIST (1 A 6 DIAS) - SUPABASE
 // ==========================================================
 let indiceMissaoAtual = 0;
 let perguntasMissao = [];
 
-function abrirMenuChecklistsGerente() {
-    // Controle do Ciclo de Dias (1 a 6)
+async function abrirMenuChecklistsGerente() {
+    // Controle do Ciclo de Dias (1 a 6) no dispositivo
     let diaDoCiclo = parseInt(localStorage.getItem("gondola_ciclo_checklist_dia")) || 1;
 
     // ==========================================
@@ -1938,12 +1610,21 @@ function abrirMenuChecklistsGerente() {
         return;
     }
 
-    // Carrega a base da planilha para os dias com perguntas (Dias 1 a 5)
-    let basePlanilha = JSON.parse(localStorage.getItem("gondola_checklist_config")) || [];
-    let perguntas = basePlanilha.filter(p => p.diaria === true);
+    let perguntas = [];
+    
+    // Busca perguntas configuradas diretamente do Supabase na tabela check_list
+    if (supabaseClient) {
+        let { data, error } = await supabaseClient
+            .from('check_list')
+            .select('*');
+
+        if (!error && data) {
+            perguntas = data;
+        }
+    }
 
     if (perguntas.length === 0) {
-        alert("⚠️ Nenhuma pergunta diária encontrada! Importe a planilha primeiro.");
+        alert("⚠️ Nenhuma pergunta de checklist encontrada na tabela 'check_list' do Supabase!");
         return;
     }
 
@@ -1951,7 +1632,7 @@ function abrirMenuChecklistsGerente() {
     // REGRA DO 5º DIA: CHECKLIST GLOBAL (TODAS)
     // ==========================================
     if (diaDoCiclo === 5) {
-        alert("📢 DIA DO CHECKLIST GLOBAL: Hoje a auditoria será COMPLETA (todas as perguntas da planilha) para preparar o diagnóstico da loja!");
+        alert("📢 DIA DO CHECKLIST GLOBAL: Hoje a auditoria será COMPLETA para preparar o diagnóstico da loja!");
         perguntas.sort(() => Math.random() - 0.5);
     } 
     // ==========================================
@@ -1964,8 +1645,12 @@ function abrirMenuChecklistsGerente() {
         }
     }
 
-    // Organiza por setor para otimizar o deslocamento na área de vendas
-    perguntas.sort((a, b) => a.setor.localeCompare(b.setor));
+    // Organiza por setor para otimizar o deslocamento na loja
+    perguntas.sort((a, b) => {
+        let setorA = a.setor || "";
+        let setorB = b.setor || "";
+        return setorA.localeCompare(setorB);
+    });
 
     perguntasMissao = perguntas;
     indiceMissaoAtual = 0;
@@ -2001,7 +1686,7 @@ function renderizarDiaDaGestao() {
                 ✅ Concluir Análise de Gestão
             </button>
 
-            <button onclick="location.reload()" style="width:100%; padding:12px; background:#6c757d; color:white; border:none; border-radius:6px; font-size:14px; margin-top: 15px; cursor:pointer;">
+            <button onclick="abrirPainelAdmin()" style="width:100%; padding:12px; background:#6c757d; color:white; border:none; border-radius:6px; font-size:14px; margin-top: 15px; cursor:pointer;">
                 ↩ Voltar ao Menu
             </button>
         </div>
@@ -2015,10 +1700,12 @@ function renderizarPerguntaDoChecklist() {
     let p = perguntasMissao[indiceMissaoAtual];
     let diaDoCiclo = parseInt(localStorage.getItem("gondola_ciclo_checklist_dia")) || 1;
     
-    // Identificação visual na barra superior
     let tituloTopo = diaDoCiclo === 5 ? "📢 CHECKLIST GLOBAL" : "📋 CHECKLIST OPERACIONAL";
     let subTitulo = diaDoCiclo === 5 ? "Auditoria Integral de Preparação" : `Auditoria Amostral - Dia ${diaDoCiclo} de 4`;
-    let corTopo = diaDoCiclo === 5 ? "#e67e22" : "#6f42c1"; // Laranja para destacar o dia Global
+    let corTopo = diaDoCiclo === 5 ? "#e67e22" : "#6f42c1";
+
+    let textoPergunta = p.pergunta || p.perguntaTexto || "Pergunta sem texto";
+    let setorPergunta = p.setor || "Geral";
 
     container.innerHTML = `
         <div class="topo" style="background:${corTopo};">
@@ -2031,10 +1718,10 @@ function renderizarPerguntaDoChecklist() {
                 Item ${indiceMissaoAtual + 1} de ${perguntasMissao.length}
             </p>
             <p style="font-size:13px;font-weight:bold;color:${corTopo};margin-bottom:20px;text-transform:uppercase;">
-                📍 Setor: ${p.setor}
+                📍 Setor: ${setorPergunta}
             </p>
             <div style="font-size:17px;font-weight:bold;margin-bottom:25px;min-height:60px;display:flex;align-items:center;justify-content:center;line-height:1.4;color:#333;">
-                "${p.pergunta}"
+                "${textoPergunta}"
             </div>
 
             <button onclick="salvarRespostaPasso('SIM')" style="width:100%;padding:16px;background:#28a745;color:white;border:none;border-radius:6px;margin-bottom:12px;font-size:16px;font-weight:bold;cursor:pointer;">
@@ -2043,7 +1730,7 @@ function renderizarPerguntaDoChecklist() {
             <button onclick="salvarRespostaPasso('NÃO')" style="width:100%;padding:16px;background:#dc3545;color:white;border:none;border-radius:6px;margin-bottom:12px;font-size:16px;font-weight:bold;cursor:pointer;">
                 🔴 NÃO CONFORME
             </button>
-            <button onclick="location.reload()" style="width:100%;padding:12px;background:#6c757d;color:white;border:none;border-radius:6px;font-size:14px;margin-top:15px;cursor:pointer;">
+            <button onclick="abrirPainelAdmin()" style="width:100%;padding:12px;background:#6c757d;color:white;border:none;border-radius:6px;font-size:14px;margin-top:15px;cursor:pointer;">
                 ↩ Cancelar e Sair
             </button>
         </div>
@@ -2055,8 +1742,8 @@ async function salvarRespostaPasso(resposta) {
     let respostas = JSON.parse(localStorage.getItem("gondola_respostas_checklist_atual")) || [];
 
     respostas.push({
-        perguntaTexto: perguntaAtual.pergunta,
-        setor: perguntaAtual.setor,
+        perguntaTexto: perguntaAtual.pergunta || perguntaAtual.perguntaTexto,
+        setor: perguntaAtual.setor || "Geral",
         resposta: resposta === "SIM" ? "OK" : "NAO_CONFORME",
         observacao: ""
     });
@@ -2070,144 +1757,108 @@ async function salvarRespostaPasso(resposta) {
     }
 
     // FINALIZAÇÃO DE RESPOSTAS (DIAS 1 A 5)
-    let historico = JSON.parse(localStorage.getItem("gondola_historico_checklists")) || [];
     let itensRespondidos = JSON.parse(localStorage.getItem("gondola_respostas_checklist_atual")) || [];
     let conformes = itensRespondidos.filter(i => i.resposta === "OK").length;
     let percentual = Math.round((conformes / itensRespondidos.length) * 100);
 
     let diaDoCiclo = parseInt(localStorage.getItem("gondola_ciclo_checklist_dia")) || 1;
-    let sessaoId = Date.now();
 
     let novoChecklist = {
-        idSessao: sessaoId,
         setor: "Checklist Operacional",
-        tipoMissao: diaDoCiclo === 5 ? "GLOBAL" : "ROTINA", // Separação para os gráficos
-        usuario: (typeof usuarioAtual !== "undefined" && usuarioAtual) ? usuarioAtual : "Administrador",
+        tipoMissao: diaDoCiclo === 5 ? "GLOBAL" : "ROTINA",
+        usuario: usuarioAtual || "Administrador",
         data: new Date().toLocaleDateString("pt-BR"),
         hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         nota: percentual,
         totalPerguntas: itensRespondidos.length,
         conformes: conformes,
-        itensRespondidos: itensRespondidos
+        itensRespondidos: JSON.stringify(itensRespondidos)
     };
 
-    historico.push(novoChecklist);
-    localStorage.setItem("gondola_historico_checklists", JSON.stringify(historico));
-    localStorage.removeItem("gondola_respostas_checklist_atual");
+    // Envio direto para a tabela check_list no Supabase
+    if (supabaseClient) {
+        let { error } = await supabaseClient
+            .from('check_list')
+            .insert([novoChecklist]);
 
-    // Envio para a nuvem (Google Sheets via Apps Script)
-    try {
-        if (typeof URL_API_GAS !== 'undefined' && URL_API_GAS) {
-            await fetch(URL_API_GAS, {
-                method: "POST",
-                mode: "no-cors",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    acao: "salvarChecklist",
-                    ...novoChecklist
-                })
-            });
+        if (error) {
+            console.error("Erro ao salvar checklist no Supabase:", error.message);
         }
-    } catch (e) {
-        console.warn("Erro ao sincronizar checklist operacional com a nuvem, salvo apenas localmente.", e);
     }
 
-    // Avança para o próximo dia (no caso, vai para o Dia 6 - Dia da Gestão)
+    localStorage.removeItem("gondola_respostas_checklist_atual");
     localStorage.setItem("gondola_ciclo_checklist_dia", diaDoCiclo + 1);
 
-    alert(`✅ Checklist gravado com sucesso!\n\nÍndice de Conformidade: ${percentual}%`);
+    alert(`✅ Checklist gravado no Supabase com sucesso!\n\nÍndice de Conformidade: ${percentual}%`);
     abrirPainelAdmin();
 }
 
 // --- CONCLUSÃO AUTOMÁTICA DO DIA DA GESTÃO ---
 async function salvarDiaDaGestaoNoHist() {
-    let historico = JSON.parse(localStorage.getItem("gondola_historico_checklists")) || [];
-    let sessaoId = Date.now();
-
     let analiseGestao = {
-        idSessao: sessaoId,
         setor: "Checklist Operacional",
-        tipoMissao: "DIA_GESTAO", // Tag estratégica
-        usuario: (typeof usuarioAtual !== "undefined" && usuarioAtual) ? usuarioAtual : "Administrador",
+        tipoMissao: "DIA_GESTAO",
+        usuario: usuarioAtual || "Administrador",
         data: new Date().toLocaleDateString("pt-BR"),
         hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        nota: 100, // Pontuação fixa pela execução da análise estratégica
+        nota: 100,
         totalPerguntas: 1,
         conformes: 1,
-        itensRespondidos: [{
+        itensRespondidos: JSON.stringify([{
             perguntaTexto: "Hoje é o dia da gestão, analise o comportamento da loja/missões, veja quais as pendencias.",
             setor: "Estratégico",
             resposta: "OK",
             observacao: "Auditoria analítica realizada pós-global"
-        }]
+        }])
     };
 
-    historico.push(analiseGestao);
-    localStorage.setItem("gondola_historico_checklists", JSON.stringify(historico));
+    if (supabaseClient) {
+        let { error } = await supabaseClient
+            .from('check_list')
+            .insert([analiseGestao]);
 
-    // Envio para a nuvem (Google Sheets via Apps Script)
-    try {
-        if (typeof URL_API_GAS !== 'undefined' && URL_API_GAS) {
-            await fetch(URL_API_GAS, {
-                method: "POST",
-                mode: "no-cors",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    acao: "salvarChecklist",
-                    ...analiseGestao
-                })
-            });
+        if (error) {
+            console.error("Erro ao salvar Dia da Gestão no Supabase:", error.message);
         }
-    } catch (e) {
-        console.warn("Erro ao sincronizar dia da gestão com a nuvem, salvo apenas localmente.", e);
     }
 
-    // Finalizou o 6º dia, reseta o ciclo completo de volta para o Dia 1
+    // Finalizou o 6º dia, reseta o ciclo para o Dia 1
     localStorage.setItem("gondola_ciclo_checklist_dia", 1);
 
-    alert("📊 Relatório de Análise da Gestão arquivado com sucesso! Ciclo reiniciado.");
+    alert("📊 Relatório de Análise da Gestão enviado ao Supabase! Ciclo reiniciado.");
     abrirPainelAdmin();
 }
-// ==========================================================
-// SERVIÇO: COLETOR DE ETIQUETAS AVULSO + NUVEM (GOOGLE SHEETS)
-// ==========================================================
 
+// ==========================================================
+// SERVIÇO: COLETOR DE ETIQUETAS AVULSO + SUPABASE
+// ==========================================================
 let scannerColetorAtivo = null;
 let produtoColetorSelecionado = null;
 
-
 function abrirColetorEtiquetas() {
-
     let container = document.querySelector(".container");
     if (!container) return;
 
     container.innerHTML = `
         <div class="topo" style="background:#f0ad4e;">
             <h1>🏷️ COLETOR DE ETIQUETAS</h1>
-            <p>Busca Direta na Base Global do Supermercado</p>
+            <p>Busca Direta no Cadastro Global do Supabase</p>
         </div>
 
-
         <div style="padding:20px;">
-
             <div id="reader_coletor" style="width:100%; border-radius:8px; overflow:hidden; margin-bottom:15px;"></div>
 
-
             <div style="display:flex; gap:8px; margin-bottom:15px;">
-
                 <button onclick="ligarCameraColetor()" 
                 style="flex:1;padding:12px;background:#007bff;color:white;border:0;border-radius:6px;font-weight:bold;">
                 📷 Abrir Câmera
                 </button>
 
-
                 <button onclick="fecharCameraColetor()" 
                 style="flex:1;padding:12px;background:#dc3545;color:white;border:0;border-radius:6px;font-weight:bold;">
                 🛑 Fechar
                 </button>
-
             </div>
-
 
             <label style="font-weight:bold;">
             Código de Barras ou Nome:
@@ -2217,157 +1868,94 @@ function abrirColetorEtiquetas() {
             placeholder="Bipe ou digite o item..."
             style="width:100%;padding:15px;margin:8px 0 15px;font-size:16px;box-sizing:border-box;">
 
-
-
             <button onclick="buscarProdutoNaBaseGlobal()"
             style="width:100%;padding:16px;background:#28a745;color:white;border:0;border-radius:6px;font-weight:bold;">
             🔍 VERIFICAR PRODUTO
             </button>
 
-
             <div id="resultado_busca_coletor" style="margin-top:20px;"></div>
-
-
 
             <button onclick="fecharCameraColetor(); voltarMenuPrincipal();"
             style="width:100%;padding:12px;background:#6c757d;color:white;border:0;border-radius:6px;margin-top:20px;">
             ↩ Voltar
             </button>
-
         </div>
     `;
 
-
-    setTimeout(()=>{
+    setTimeout(() => {
         document.getElementById("input_coletor_etiqueta")?.focus();
-    },100);
+    }, 100);
 }
 
-
-
-
-
-function ligarCameraColetor(){
-
+function ligarCameraColetor() {
     fecharCameraColetor();
 
     scannerColetorAtivo = new Html5QrcodeScanner(
         "reader_coletor",
         {
-            fps:10,
-            qrbox:{width:250,height:150}
+            fps: 10,
+            qrbox: { width: 250, height: 150 }
         }
     );
 
-
-    scannerColetorAtivo.render((codigo)=>{
-
-        let input=document.getElementById("input_coletor_etiqueta");
-
-        if(input){
-            input.value=codigo;
+    scannerColetorAtivo.render((codigo) => {
+        let input = document.getElementById("input_coletor_etiqueta");
+        if (input) {
+            input.value = codigo;
             fecharCameraColetor();
             buscarProdutoNaBaseGlobal();
         }
-
-    },()=>{});
-
+    }, () => {});
 }
 
-
-
-
-
-function fecharCameraColetor(){
-
-    if(scannerColetorAtivo){
-
-        try{
-            scannerColetorAtivo.clear();
-        }catch(e){}
-
-        scannerColetorAtivo=null;
+function fecharCameraColetor() {
+    if (scannerColetorAtivo) {
+        try { scannerColetorAtivo.clear(); } catch(e) {}
+        scannerColetorAtivo = null;
     }
 
-
-    let div=document.getElementById("reader_coletor");
-
-    if(div){
-        div.innerHTML="";
-    }
+    let div = document.getElementById("reader_coletor");
+    if (div) div.innerHTML = "";
 }
 
-
-function buscarProdutoNaBaseGlobal(){
-
+async function buscarProdutoNaBaseGlobal() {
     let input = document.getElementById("input_coletor_etiqueta");
     let resultado = document.getElementById("resultado_busca_coletor");
 
-    if(!input || !resultado) return;
+    if (!input || !resultado) return;
 
-    let termo = input.value.trim().toUpperCase();
+    let termo = input.value.trim();
 
-    if(!termo){
+    if (!termo) {
         alert("Digite ou bipe um produto!");
         return;
     }
 
-    let baseGlobal =
-    JSON.parse(localStorage.getItem("base_global")) ||
-    JSON.parse(localStorage.getItem("gondola_base_global")) ||
-    JSON.parse(localStorage.getItem("gondola_produtos_config")) ||
-    [];
+    resultado.innerHTML = `<p style="text-align:center; color:#6c757d;">🔍 Consultando cadastro global no Supabase...</p>`;
 
-    let encontrado = null;
+    // Utiliza a função centralizada de busca no cadastro_global do Supabase
+    let produtos = await buscarProdutoCadastroGlobal(termo);
 
-    for(let item of baseGlobal){
-        if(!item) continue;
-
-        let codigo =
-        (item.codigo ||
-        item.cod_barra ||
-        item.barcode ||
-        item.codBarras ||
-        "")
-        .toString()
-        .trim();
-
-        let nome =
-        (item.produto ||
-        item.descricao ||
-        item.pergunta ||
-        item.nome ||
-        "")
-        .toUpperCase();
-
-        if(codigo === termo || (termo.length > 3 && nome.includes(termo))){
-            encontrado = item;
-            break;
-        }
-    }
-
-    if(encontrado){
-        let nome =
-        encontrado.produto ||
-        encontrado.descricao ||
-        encontrado.pergunta ||
-        encontrado.nome ||
-        termo;
+    if (produtos && produtos.length > 0) {
+        let encontrado = produtos[0];
+        let nome = encontrado.PRODUTO || encontrado.descricao || termo;
+        let cod = encontrado['CODIGO DE BARRAS'] || encontrado.codigo || termo;
+        let setor = encontrado.setor || "Geral";
 
         produtoColetorSelecionado = {
-            codigo: encontrado.codigo || termo,
+            codigo: cod,
             nome: nome,
-            setor: encontrado.setor || "Geral"
+            setor: setor
         };
 
         resultado.innerHTML = `
-        <div style="background:#d4edda;padding:15px;border-radius:6px;">
-            <strong>✅ PRODUTO ENCONTRADO</strong>
-            <p style="font-weight:bold;font-size:16px;">${nome}</p>
-            <small>📍 Setor: ${produtoColetorSelecionado.setor}</small>
+        <div style="background:#d4edda;padding:15px;border-radius:6px;text-align:left;">
+            <strong>✅ PRODUTO ENCONTRADO NO SUPABASE</strong>
+            <p style="font-weight:bold;font-size:16px;margin:5px 0;">${nome}</p>
+            <small>📍 Setor: ${setor} | Cód: ${cod}</small>
         </div>
         <button onclick="confirmarEGravarEtiquetaPendente()"
-        style="width:100%;padding:16px;background:#28a745;color:white;border:0;border-radius:6px;margin-top:15px;font-weight:bold;">
+        style="width:100%;padding:16px;background:#28a745;color:white;border:0;border-radius:6px;margin-top:15px;font-weight:bold;cursor:pointer;">
         💾 Confirmar e Gerar Etiqueta
         </button>
         `;
@@ -2379,90 +1967,55 @@ function buscarProdutoNaBaseGlobal(){
         };
 
         resultado.innerHTML = `
-        <div style="background:#fff3cd;padding:15px;border-radius:6px;">
-            ⚠️ Produto não localizado.
+        <div style="background:#fff3cd;padding:15px;border-radius:6px;text-align:left;">
+            ⚠️ Produto não localizado no Cadastro Global.
             <br><br>
-            Será salvo como:
-            <b>${termo}</b>
+            Será gerado como: <b>${termo}</b>
         </div>
         <button onclick="confirmarEGravarEtiquetaPendente()"
-        style="width:100%;padding:16px;background:#ffc107;border:0;border-radius:6px;margin-top:15px;font-weight:bold;">
-        ⚠️ Confirmar Etiqueta
+        style="width:100%;padding:16px;background:#ffc107;border:0;border-radius:6px;margin-top:15px;font-weight:bold;cursor:pointer;">
+        ⚠️ Confirmar Etiqueta Avulsa
         </button>
         `;
     }
 }
 
-async function confirmarEGravarEtiquetaPendente(){
-
-    if(!produtoColetorSelecionado){
+async function confirmarEGravarEtiquetaPendente() {
+    if (!produtoColetorSelecionado) {
         alert("Nenhum produto selecionado!");
         return;
     }
 
-    let lista = JSON.parse(localStorage.getItem("etiquetas_pendentes")) || [];
-
-    let nome = produtoColetorSelecionado.nome
-    .toString()
-    .trim()
-    .toUpperCase();
-
-    let novaEtiqueta = {
-        id: Date.now() + Math.random(),
-        codigo: produtoColetorSelecionado.codigo,
-        produto: nome,
-        descricao: nome,
-        pergunta: nome,
-        setor: produtoColetorSelecionado.setor,
-        data: new Date().toLocaleDateString("pt-BR"),
-        precificado: false,
-        status: "PENDENTE"
-    };
-
-    lista.push(novaEtiqueta);
-
-    localStorage.setItem(
-        "etiquetas_pendentes",
-        JSON.stringify(lista)
+    let loja = localStorage.getItem("lojaAtual") || "Geral";
+    
+    // Grava diretamente na tabela etiquetas_pendentes do Supabase
+    let sucesso = await salvarEtiquetaPendente(
+        produtoColetorSelecionado.codigo,
+        produtoColetorSelecionado.nome,
+        loja,
+        produtoColetorSelecionado.setor
     );
 
-    // Sincronização em nuvem (Google Sheets) com a ação correta
-    try {
-        if (typeof URL_API_GAS !== 'undefined' && URL_API_GAS) {
-            await fetch(URL_API_GAS, {
-                method: "POST",
-                mode: "no-cors",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    acao: "salvarEtiquetaPendente",
-                    ...novaEtiqueta
-                })
-            });
-        }
-    } catch (e) {
-        console.warn("Erro ao sincronizar etiqueta com a nuvem, salva localmente.", e);
+    if (sucesso) {
+        alert("✅ Etiqueta pendente enviada para o Supabase:\n\n" + produtoColetorSelecionado.nome);
     }
-
-    alert("✅ Etiqueta salva:\n\n" + nome);
 
     produtoColetorSelecionado = null;
 
     let campo = document.getElementById("input_coletor_etiqueta");
-    if(campo){
+    if (campo) {
         campo.value = "";
         campo.focus();
     }
 
     let resultado = document.getElementById("resultado_busca_coletor");
-    if(resultado){
-        resultado.innerHTML = "";
-    }
+    if (resultado) resultado.innerHTML = "";
 }
 
 // ==========================================================
-// IMPORTAÇÃO DE RUAS E ROTAS (CSV LOCAL + NUVEM)
+// IMPORTAÇÃO DE RUAS E ROTAS (ENDEREÇOS VIA SUPABASE)
 // ==========================================================
-function processarArquivoCSVRotas(elementoInput) {
+async function processarArquivoCSVRotas(elementoInput) {
     let arquivo = elementoInput.files[0];
     if (!arquivo) return;
 
@@ -2483,78 +2036,53 @@ function processarArquivoCSVRotas(elementoInput) {
                 if (nomeRua === "" || nomeRua === "NOME") continue;
 
                 resultado.push({
-                    CIDADE: colunas[0] ? colunas[0].trim().toUpperCase() : "",
-                    BAIRRO: colunas[1] ? colunas[1].trim().toUpperCase() : "",
-                    NOME:   nomeRua,
-                    ROTA:   colunas[3] ? colunas[3].trim().replace("\r", "") : "1"
+                    cidade: colunas[0] ? colunas[0].trim().toUpperCase() : "",
+                    bairro: colunas[1] ? colunas[1].trim().toUpperCase() : "",
+                    rua: nomeRua,
+                    rota: colunas[3] ? colunas[3].trim().replace("\r", "") : "1"
                 });
             }
 
-            localStorage.setItem("base_ruas_entrega", JSON.stringify(resultado));
+            if (supabaseClient && resultado.length > 0) {
+                const { error } = await supabaseClient
+                    .from('enderecos')
+                    .insert(resultado);
 
-            // Sincroniza a base de ruas com a nuvem para manter todos os caixas atualizados
-            try {
-                if (typeof URL_API_GAS !== 'undefined' && URL_API_GAS) {
-                    await fetch(URL_API_GAS, {
-                        method: "POST",
-                        mode: "no-cors",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            acao: "sincronizarBaseRuas",
-                            ruas: resultado
-                        })
-                    });
+                if (error) {
+                    console.error("Erro ao salvar base de endereços no Supabase:", error.message);
+                    alert("Erro ao sincronizar endereços no Supabase.");
+                    return;
                 }
-            } catch (netErr) {
-                console.warn("Aviso: Base de ruas gravada localmente, falha na sincronização via nuvem.", netErr);
             }
 
-            alert("✅ Planilha base integrada e sincronizada! " + resultado.length + " ruas prontas.");
-            
+            alert("✅ Base de endereços e rotas sincronizada no Supabase! " + resultado.length + " ruas cadastradas.");
             if (typeof abrirPainelAdmin === "function") abrirPainelAdmin();
 
         } catch (err) {
             console.error(err);
-            alert("❌ Erro ao ler a planilha.");
+            alert("❌ Erro ao processar o arquivo CSV.");
         }
     };
     leitor.readAsText(arquivo, "UTF-8");
 }
 
-// --- Variáveis de Controle do Fluxo em Cascata ---
 let entregaEmEdicao = {
-    cliente: "", cidade: "", bairro: "", rua: "", numero: "", apartamento: "Não", aptoDetalhe: "", caixas: 1, gelados: "Não"
+    cliente: "", cidade: "", bairro: "", rua: "", numero: "", apartamento: "Não", aptoDetalhe: "", caixas: 1, gelados: "Não", rota: "1"
 };
 
-// --- FUNÇÃO PARA CARREGAR RUAS DA NUVEM SE NECESSÁRIO ---
-async function carregarBaseRuasDaNuvem() {
-    try {
-        if (typeof URL_API_GAS !== 'undefined' && URL_API_GAS) {
-            let resposta = await fetch(`${URL_API_GAS}?acao=obterBaseRuas`);
-            let dadosNuvem = await resposta.json();
-            if (dadosNuvem && Array.isArray(dadosNuvem) && dadosNuvem.length > 0) {
-                localStorage.setItem("base_ruas_entrega", JSON.stringify(dadosNuvem));
-            }
-        }
-    } catch (e) {
-        console.warn("Usando base de ruas local (offline ou sem retorno da nuvem).", e);
-    }
-}
-
-// --- 2. TELA PRINCIPAL DO FISCAL DE CAIXA (LANÇAMENTO) ---
+// ==========================================
+// LANÇAMENTO DE ENTREGAS (FISCAL DE CAIXA)
+// ==========================================
 async function abrirAbaLancamentoEntrega() {
     let container = document.querySelector(".container");
     if (!container) return;
 
-    // Atualiza base de ruas da nuvem em segundo plano ao abrir a tela
-    await carregarBaseRuasDaNuvem();
-
-    entregaEmEdicao = { cliente: "", cidade: "", bairro: "", rua: "", numero: "", apartamento: "Não", aptoDetalhe: "", caixas: 1, gelados: "Não" };
+    entregaEmEdicao = { cliente: "", cidade: "", bairro: "", rua: "", numero: "", apartamento: "Não", aptoDetalhe: "", caixas: 1, gelados: "Não", rota: "1" };
 
     container.innerHTML = `
         <div class="topo" style="background:#0275d8;">
             <h1>📦 LANÇAMENTO DE ENTREGAS</h1>
-            <p>Fluxo Blindado contra Erros de Operação</p>
+            <p>Fluxo Direto Conectado ao Supabase</p>
         </div>
 
         <div style="padding: 20px; text-align: left;">
@@ -2610,10 +2138,11 @@ async function abrirAbaLancamentoEntrega() {
             </button>
         </div>
     `;
+
+    renderizarBotoesCidade();
 }
 
-// --- 3. INTELIGÊNCIA DO CADASTRO AUTOMÁTICO ---
-function buscarClienteCadastro(nomeDigitado) {
+async function buscarClienteCadastro(nomeDigitado) {
     let termo = nomeDigitado.trim().toUpperCase();
     let divSugestoes = document.getElementById("sugestoes_clientes");
     if (!divSugestoes) return;
@@ -2623,64 +2152,68 @@ function buscarClienteCadastro(nomeDigitado) {
         return;
     }
 
-    let cadastros = JSON.parse(localStorage.getItem("cadastro_clientes_entrega")) || [];
-    let filtrados = cadastros.filter(c => c.nome.includes(termo));
+    if (!supabaseClient) return;
 
-    if (filtrados.length === 0) {
-        divSugestoes.innerHTML = `<div style="padding:10px; color:#888; font-size:13px;">🆕 Cliente novo. Prossiga com os botões abaixo.</div>`;
+    let { data } = await supabaseClient
+        .from('entregas')
+        .select('*')
+        .ilike('cliente', `%${termo}%`)
+        .limit(5);
+
+    if (!data || data.length === 0) {
+        divSugestoes.innerHTML = `<div style="padding:10px; color:#888; font-size:13px;">🆕 Cliente novo. Prossiga abaixo.</div>`;
         entregaEmEdicao.cliente = termo;
-        if(document.getElementById("painel_cascata_botoes").innerHTML === "") {
-            renderizarBotoesCidade();
-        }
         return;
     }
 
-    divSugestoes.innerHTML = filtrados.map(c => `
-        <div onclick="aplicarClienteCadastrado('${c.nome}')" 
+    divSugestoes.innerHTML = data.map(c => `
+        <div onclick="aplicarClienteCadastrado('${c.cliente}', '${c.cidade \vert{}\vert{} ''}', '${c.bairro || ''}', '${c.rua \vert{}\vert{} ''}', '${c.numero || ''}', '${c.apartamento \vert{}\vert{} 'Não'}', '${c.apartamentoDetalhe || ''}')" 
              style="padding:12px; border-bottom:1px solid #eee; cursor:pointer; background:#fffbf0; font-weight:bold; color:#333;">
-             👤 ${c.nome} <br><span style="font-size:11px; color:#777;">📍 ${c.rua}, Nº ${c.numero} - ${c.bairro}</span>
+             👤 ${c.cliente} <br><span style="font-size:11px; color:#777;">📍 ${c.rua || ''}, Nº ${c.numero \vert{}\vert{} ''} -${c.bairro || ''}</span>
         </div>
     `).join("");
 }
 
-function aplicarClienteCadastrado(nomeCliente) {
-    let cadastros = JSON.parse(localStorage.getItem("cadastro_clientes_entrega")) || [];
-    let c = cadastros.find(item => item.nome === nomeCliente);
+function aplicarClienteCadastrado(nome, cidade, bairro, rua, numero, apto, aptoDet) {
+    document.getElementById("ent_nome_cliente").value = nome;
+    document.getElementById("sugestoes_clientes").innerHTML = "";
 
-    if (c) {
-        document.getElementById("ent_nome_cliente").value = c.nome;
-        document.getElementById("sugestoes_clientes").innerHTML = "";
-
-        entregaEmEdicao = {
-            cliente: c.nome, cidade: c.cidade, bairro: c.bairro, rua: c.rua,
-            numero: c.numero, apartamento: c.apartamento, aptoDetalhe: c.apartamentoDetalhe,
-            caixas: 1, gelados: "Não"
-        };
-
-        let painel = document.getElementById("painel_cascata_botoes");
-        painel.innerHTML = `
-            <div style="background:#d1ecf1; color:#0c5460; padding:12px; border-radius:6px; margin-bottom:10px; border-left:5px solid #17a2b8;">
-                <strong>📍 Endereço Recorrente Carregado:</strong><br>
-                ${c.rua}, ${c.numero} ${c.apartamento === 'Sim' ? '- ' + c.apartamentoDetalhe : ''}<br>
-                ${c.bairro} (${c.cidade})
-                <button onclick="renderizarBotoesCidade()" style="margin-top:8px; display:block; padding:4px 8px; background:#17a2b8; color:white; border:none; border-radius:4px; font-size:11px; cursor:pointer;">🔄 Alterar Endereço</button>
-            </div>
-        `;
-
-        document.getElementById("formulario_final_entrega").style.display = "block";
-        document.getElementById("ent_numero").value = c.numero;
-        document.getElementById("ent_apto").value = c.apartamento;
-        toggleCampoApartamento(c.apartamento);
-        document.getElementById("ent_apto_detalhe").value = c.apartamentoDetalhe;
-    }
-}
-
-// --- 4. RENDERIZADORES DA CASCATA DE BOTÕES ---
-function renderizarBotoesCidade() {
-    let baseRuas = JSON.parse(localStorage.getItem("base_ruas_entrega")) || [];
-    let cidades = [...new Set(baseRuas.map(r => r.CIDADE))].sort();
+    entregaEmEdicao = {
+        cliente: nome, cidade: cidade, bairro: bairro, rua: rua,
+        numero: numero, apartamento: apto, aptoDetalhe: aptoDet,
+        caixas: 1, gelados: "Não"
+    };
 
     let painel = document.getElementById("painel_cascata_botoes");
+    painel.innerHTML = `
+        <div style="background:#d1ecf1; color:#0c5460; padding:12px; border-radius:6px; margin-bottom:10px; border-left:5px solid #17a2b8;">
+            <strong>📍 Endereço Recorrente:</strong><br>
+            ${rua}, ${numero}${apto === 'Sim' ? '- ' + aptoDet : ''}<br>
+            ${bairro} (${cidade})
+            <button onclick="renderizarBotoesCidade()" style="margin-top:8px; display:block; padding:4px 8px; background:#17a2b8; color:white; border:none; border-radius:4px; font-size:11px; cursor:pointer;">🔄 Alterar Endereço</button>
+        </div>
+    `;
+
+    document.getElementById("formulario_final_entrega").style.display = "block";
+    document.getElementById("ent_numero").value = numero;
+    document.getElementById("ent_apto").value = apto;
+    toggleCampoApartamento(apto);
+    document.getElementById("ent_apto_detalhe").value = aptoDet;
+}
+
+async function renderizarBotoesCidade() {
+    let cidades = ["MANHUMIRIM", "ALTO JEQUITIBÁ", "MANHUAÇU"];
+
+    if (supabaseClient) {
+        let { data } = await supabaseClient.from('enderecos').select('cidade');
+        if (data && data.length > 0) {
+            cidades = [...new Set(data.map(r => r.cidade))].sort();
+        }
+    }
+
+    let painel = document.getElementById("painel_cascata_botoes");
+    if (!painel) return;
+
     document.getElementById("formulario_final_entrega").style.display = "none";
 
     painel.innerHTML = `
@@ -2691,401 +2224,42 @@ function renderizarBotoesCidade() {
     `;
 }
 
-function selecionarCidade(nomeCidade) {
+async function selecionarCidade(nomeCidade) {
     entregaEmEdicao.cidade = nomeCidade;
-    
-    let baseRuas = JSON.parse(localStorage.getItem("base_ruas_entrega")) || [];
-    let bairros = [...new Set(baseRuas.filter(r => r.CIDADE === nomeCidade).map(r => r.BAIRRO))].sort();
+    let bairros = [];
+
+    if (supabaseClient) {
+        let { data } = await supabaseClient
+            .from('enderecos')
+            .select('bairro')
+            .eq('cidade', nomeCidade);
+        if (data) bairros = [...new Set(data.map(r => r.bairro))].sort();
+    }
 
     let painel = document.getElementById("painel_cascata_botoes");
     painel.innerHTML = `
         <div style="color:#28a745; font-size:13px; margin-bottom:8px;">✅ Cidade: <b>${nomeCidade}</b></div>
-        <label style="font-weight:bold; font-size:13px; color:#555; display:block; margin-bottom:5px;">2. Selecione o Bairro:</label>
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            ${bairros.map(bai => `<button onclick="selecionarBairro('${bai}')" style="padding:10px 14px; background:#fff; border:2px solid #f0ad4e; color:#f0ad4e; border-radius:6px; font-weight:bold; cursor:pointer;">🏡 ${bai}</button>`).join("")}
-        </div>
-    `;
-}
+        <label style="font-weight:bold; font
+async function autenticarNoSupabase(nomeDigitado, matriculaDigitada) {
+    if (!supabaseClient) return false;
 
-function selecionarBairro(nomeBairro) {
-    entregaEmEdicao.bairro = nomeBairro;
+    let { data, error } = await supabaseClient
+        .from('usuarios') // Nome da tabela de colaboradores no Supabase
+        .select('*')
+        .eq('matricula', matriculaDigitada)
+        .single();
 
-    let baseRuas = JSON.parse(localStorage.getItem("base_ruas_entrega")) || [];
-    let ruas = baseRuas.filter(r => r.CIDADE === entregaEmEdicao.cidade && r.BAIRRO === nomeBairro).map(r => r.NOME).sort();
-
-    let painel = document.getElementById("painel_cascata_botoes");
-    painel.innerHTML = `
-        <div style="color:#28a745; font-size:13px; margin-bottom:4px;">✅ Cidade: <b>${entregaEmEdicao.cidade}</b></div>
-        <div style="color:#28a745; font-size:13px; margin-bottom:8px;">✅ Bairro: <b>${nomeBairro}</b></div>
-        <label style="font-weight:bold; font-size:13px; color:#555; display:block; margin-bottom:5px;">3. Selecione a Rua / Avenida:</label>
-        <div style="display:flex; flex-direction:column; gap:6px;">
-            ${ruas.map(rua => `<button onclick="selecionarRua('${rua.replace(/'/g, "\\'")}')" style="padding:12px; background:#fff; border:1px solid #ddd; text-align:left; border-radius:6px; font-weight:bold; color:#333; cursor:pointer; border-left:4px solid #6c757d;">🛣️ ${rua}</button>`).join("")}
-        </div>
-    `;
-}
-
-function selecionarRua(nomeRua) {
-    entregaEmEdicao.rua = nomeRua;
-
-    let baseRuas = JSON.parse(localStorage.getItem("base_ruas_entrega")) || [];
-    let ruaEncontrada = baseRuas.find(r => 
-        r.CIDADE === entregaEmEdicao.cidade && 
-        r.BAIRRO === entregaEmEdicao.bairro && 
-        r.NOME === nomeRua
-    );
-    
-    entregaEmEdicao.rota = ruaEncontrada ? ruaEncontrada.ROTA : "1";
-
-    let painel = document.getElementById("painel_cascata_botoes");
-    if (painel) {
-        painel.innerHTML = `
-            <div style="color:#28a745; font-size:13px; margin-bottom:2px;">✅ Cidade: <b>${entregaEmEdicao.cidade}</b></div>
-            <div style="color:#28a745; font-size:13px; margin-bottom:2px;">✅ Bairro: <b>${entregaEmEdicao.bairro}</b></div>
-            <div style="color:#28a745; font-size:13px; margin-bottom:8px;">✅ Rua: <b>${nomeRua}</b> (Rota: ${entregaEmEdicao.rota})</div>
-        `;
+    if (error || !data) {
+        alert("Matrícula não encontrada ou acesso negado.");
+        return false;
     }
 
-    let elCidade = document.getElementById("lbl_cidade") || document.querySelector("[id*='cidade']") || document.querySelector("[id*='Cidade']");
-    let elBairro = document.getElementById("lbl_bairro") || document.querySelector("[id*='bairro']") || document.querySelector("[id*='Bairro']");
-    let elRua    = document.getElementById("lbl_rua")    || document.querySelector("[id*='rua']")    || document.querySelector("[id*='Rua']");
+    // Salva as credenciais da sessão no navegador
+    usuarioAtual = data.nome;
+    setorSelecionado = data.setor;
+    localStorage.setItem("usuarioAtual", data.nome);
+    localStorage.setItem("setorAtual", data.setor);
+    localStorage.setItem("lojaAtual", data.loja);
 
-    if (elCidade) elCidade.innerText = "Cidade: " + entregaEmEdicao.cidade;
-    if (elBairro) elBairro.innerText = "Bairro: " + entregaEmEdicao.bairro;
-    if (elRua)    elRua.innerText    = "Rua: " + nomeRua + " (Rota: " + entregaEmEdicao.rota + ")";
-
-    document.getElementById("formulario_final_entrega").style.display = "block";
-    
-    let campoNumero = document.getElementById("ent_numero") || document.getElementById("numero_residencia") || document.querySelector("input[placeholder*='Número']");
-    if (campoNumero) campoNumero.focus();
+    return true;
 }
-
-function toggleCampoApartamento(valor) {
-    document.getElementById("bloco_detalhe_apto").style.display = (valor === "Sim") ? "block" : "none";
-}
-
-// --- 5. GRAVAÇÃO REAL E SINCRONIZAÇÃO EM NUVEM ---
-async function salvarNovaEntrega() {
-    let nomeCliente = document.getElementById("ent_nome_cliente").value.trim().toUpperCase();
-    let num = document.getElementById("ent_numero").value.trim().toUpperCase();
-    let apto = document.getElementById("ent_apto").value;
-    let aptoDet = document.getElementById("ent_apto_detalhe").value.trim().toUpperCase();
-    let cx = parseInt(document.getElementById("ent_caixas").value) || 1;
-    let gel = document.getElementById("ent_gelados").value;
-
-    if (!nomeCliente) { alert("⚠️ Digite o nome do cliente!"); return; }
-    if (!num) { alert("⚠️ Informe o número ou digite S/N!"); return; }
-    if (apto === "Sim" && !aptoDet) { alert("⚠️ Digite os dados do apartamento!"); return; }
-
-    let entregasAtuais = JSON.parse(localStorage.getItem("registro_entregas")) || [];
-    
-    let novaEntrega = {
-        idEntrega: Date.now(),
-        cliente: nomeCliente,
-        cidade: entregaEmEdicao.cidade || "MANHUMIRIM",
-        bairro: entregaEmEdicao.bairro,
-        rua: entregaEmEdicao.rua,
-        numero: num,
-        apartamento: apto,
-        apartamentoDetalhe: aptoDet,
-        caixas: cx,
-        gelados: gel,
-        status: "Pendente",
-        dataLancamento: new Date().toLocaleDateString("pt-BR"),
-        horaLancamento: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        horaFinalizacao: null,
-        tempoDecorridoMinutos: null,
-        dentroDoPrazo: true,
-        rota: entregaEmEdicao.rota || "1"
-    };
-
-    entregasAtuais.push(novaEntrega);
-    localStorage.setItem("registro_entregas", JSON.stringify(entregasAtuais));
-
-    // Salva na nuvem (Google Sheets)
-    try {
-        if (typeof URL_API_GAS !== 'undefined' && URL_API_GAS) {
-            await fetch(URL_API_GAS, {
-                method: "POST",
-                mode: "no-cors",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    acao: "salvarEntrega",
-                    ...novaEntrega
-                })
-            });
-        }
-    } catch (e) {
-        console.warn("Entrega salva localmente, falha ao sincronizar com a nuvem.", e);
-    }
-
-    let cadastros = JSON.parse(localStorage.getItem("cadastro_clientes_entrega")) || [];
-    if (!cadastros.some(item => item.nome === nomeCliente)) {
-        cadastros.push({
-            nome: nomeCliente, cidade: novaEntrega.cidade, bairro: novaEntrega.bairro,
-            rua: novaEntrega.rua, numero: num, apartamento: apto, apartamentoDetalhe: aptoDet
-        });
-        localStorage.setItem("cadastro_clientes_entrega", JSON.stringify(cadastros));
-    }
-
-    alert(`✅ Sucesso!\nTicket Gerado para ${nomeCliente}.\nMeta de Entrega: até às ${calcularHoraLimite(novaEntrega.horaLancamento)}`);
-    abrirAbaLancamentoEntrega();
-}
-
-function calcularHoraLimite(horaString) {
-    if (!horaString) return "--:--";
-    
-    let partes = horaString.split(":");
-    let h = parseInt(partes[0]);
-    let m = partes[1];
-    
-    // Se foi feito após as 18h, o prazo de 4h começa às 10h do dia seguinte (limite às 14h)
-    if (h >= 18) {
-        return "14:00 (Próx. Dia)";
-    }
-    
-    // Se foi antes das 10h, considera o início do expediente às 10h
-    if (h < 10) {
-        h = 10;
-    }
-    
-    // Soma as 4 horas da meta
-    let horaFinal = (h + 4) % 24;
-    return `${horaFinal.toString().padStart(2, '0')}:${m}`;
-}
-
-// --- ABA DO MOTORISTA (COM SINCRONIZAÇÃO EM NUVEM) ---
-async function abrirAbaMotoristaEntrega(rotaParaManterAberta = null) {
-    let container = document.querySelector(".container");
-    if (!container) return;
-
-    // Tenta atualizar as entregas da nuvem antes de renderizar
-    try {
-        if (typeof URL_API_GAS !== 'undefined' && URL_API_GAS) {
-            let resposta = await fetch(`${URL_API_GAS}?acao=obterEntregas`);
-            let dadosNuvem = await resposta.json();
-            if (dadosNuvem && Array.isArray(dadosNuvem) && dadosNuvem.length > 0) {
-                localStorage.setItem("registro_entregas", JSON.stringify(dadosNuvem));
-            }
-        }
-    } catch (e) {
-        console.warn("Usando base de entregas local.", e);
-    }
-
-    let entregas = JSON.parse(localStorage.getItem("registro_entregas")) || [];
-    let ativas = entregas.filter(e => e.status === "Pendente" || e.status === "Em Trânsito");
-
-    let totalNaLoja = entregas.filter(e => e.status === "Pendente").length;
-    let totalNoCarro = entregas.filter(e => e.status === "Em Trânsito").length;
-
-    let rotasAgrupadas = {};
-    ativas.forEach(e => {
-        let numRota = e.rota || e.ROTA || "1";
-        let identificadorRota = "ROTA " + numRota;
-        
-        if (!rotasAgrupadas[identificadorRota]) {
-            rotasAgrupadas[identificadorRota] = {
-                entregas: [],
-                totalCaixas: 0,
-                totalGelados: 0
-            };
-        }
-        
-        rotasAgrupadas[identificadorRota].entregas.push(e);
-        rotasAgrupadas[identificadorRota].totalCaixas += parseInt(e.caixas || e.volumes || 0, 10);
-        
-        if (e.gelados === "Sim" || e.GELADOS === "Sim") {
-            rotasAgrupadas[identificadorRota].totalGelados += 1;
-        }
-    });
-
-    container.innerHTML = `
-        <div class="topo" style="background:#5cb85c;">
-            <h1>🚚 ROTEIRO DO MOTORISTA</h1>
-            <div style="display:flex; justify-content:space-around; margin-top:10px; font-size:13px; background:rgba(0,0,0,0.1); padding:8px; border-radius:6px;">
-                <span>🏪 Na Loja: <strong>${totalNaLoja} compras</strong></span>
-                <span>🛣️ No Carro: <strong>${totalNoCarro} compras</strong></span>
-            </div>
-        </div>
-
-        <div style="padding: 15px; text-align: left;">
-            
-            ${ativas.length === 0 ? `
-                <div style="text-align:center; padding:30px; color:#666;">
-                    🎉 <b>Excelente!</b> Nenhuma entrega pendente na loja ou no carro.
-                </div>
-            ` : `
-                ${Object.keys(rotasAgrupadas).sort((a, b) => {
-                    let numA = parseInt(a.replace(/\D/g, ''), 10) || 0;
-                    let numB = parseInt(b.replace(/\D/g, ''), 10) || 0;
-                    return numA - numB;
-                }).map(nomeRota => {
-                    let dadosRota = rotasAgrupadas[nomeRota];
-                    let deveAbrir = (nomeRota === rotaParaManterAberta) ? "open" : "";
-                    
-                    return `
-                    <details ${deveAbrir} id="det-${nomeRota.replace(/\s+/g, '')}" ontoggle="if(this.open) { window.lastOpenedRoute = '${nomeRota}'; }" style="background:#fff; border:1px solid #ddd; border-radius:8px; margin-bottom:15px; box-shadow:0 2px 4px rgba(0,0,0,0.05); overflow:hidden;">
-                        
-                        <summary style="background:#e2f0d9; color:#385723; padding:12px; font-weight:bold; font-size:14px; border-bottom:1px solid #bcd; line-height:1.5; cursor:pointer; outline:none;">
-                            <span style="font-size:15px; display:block; margin-bottom:4px;">📍 ${nomeRota.toUpperCase()}</span>
-                            📋 Entregas ${dadosRota.entregas.length}<br>
-                            📦 Caixas ${dadosRota.totalCaixas}
-                            ${dadosRota.totalGelados > 0 ? `<br>❄️ Gelado ${dadosRota.totalGelados}` : ''}
-                        </summary>
-                        
-                        <div style="padding:10px; background:#fdfdfd;">
-                            ${dadosRota.entregas.map(item => {
-                                let noCarro = item.status === "Em Trânsito";
-                                return `
-                                <div style="padding:12px 0; border-bottom:1px solid #eee; background:${noCarro ? '#f7faff' : 'transparent'}; border-left: ${noCarro ? '4px solid #0275d8' : 'none'}; padding-left: ${noCarro ? '8px' : '0px'};">
-                                    <span style="font-size:11px; color:#777; float:right;">⏱️ ${item.horaLancamento || ''}</span>
-                                    
-                                    <span style="font-size:11px; float:right; margin-right:10px; background:${noCarro ? '#0275d8' : '#e67e22'}; color:white; padding:1px 5px; border-radius:4px; font-weight:bold;">
-                                        ${noCarro ? '🛣️ NO CARRO' : '🏪 NA LOJA'}
-                                    </span>
-
-                                    <strong style="font-size:15px; color:#333;">👤 ${item.cliente}</strong>
-                                    <p style="margin:4px 0; font-size:13px; color:#555;">
-                                        🏠 ${item.rua}, Nº ${item.numero} ${item.apartamento === 'Sim' ? '<b>(' + (item.apartamentoDetalhe || item.detalheApto || '') + ')</b>' : ''}
-                                    </p>
-                                    <p style="margin:2px 0; font-size:12px; color:#888;">🏡 Bairro: ${item.bairro} | 🏙️ ${item.cidade || ''}</p>
-                                    
-                                    <div style="margin:5px 0; font-size:13px;">
-                                        📦 <b>Volumes:</b> <span style="background:#ddd; padding:2px 6px; border-radius:4px; font-weight:bold;">${item.caixas || item.volumes || 0}</span>
-                                        ${item.gelados === 'Sim' ? `<span style="background:#b0cedb; color:#0c5460; padding:2px 6px; border-radius:4px; font-weight:bold; margin-left:5px; font-size:11px;">❄️ Contém Gelados</span>` : ''}
-                                    </div>
-
-                                    <div style="margin-top:10px;">
-                                        ${!noCarro ? `
-                                            <button onclick="inserirCompraNaRota(${item.idEntrega || item.id}, '${nomeRota}')" style="width:100%; padding:8px; background:#0275d8; color:white; border:none; border-radius:4px; font-weight:bold; font-size:12px; cursor:pointer;">
-                                                🚚 Inserir esta compra no Carro
-                                            </button>
-                                        ` : `
-                                            <div style="display:flex; gap:5px;">
-                                                <button onclick="mudarStatusEntrega(${item.idEntrega || item.id}, 'Entregue', '${nomeRota}')" style="flex:1; padding:8px; background:#28a745; color:white; border:none; border-radius:4px; font-weight:bold; font-size:12px; cursor:pointer;">✅ Entregue</button>
-                                                <button onclick="mudarStatusEntrega(${item.idEntrega || item.id}, 'Não Recebida', '${nomeRota}')" style="flex:1; padding:8px; background:#f0ad4e; color:white; border:none; border-radius:4px; font-weight:bold; font-size:12px; cursor:pointer;">❌ Não Rec.</button>
-                                                <button onclick="mudarStatusEntrega(${item.idEntrega || item.id}, 'Não Localizada', '${nomeRota}')" style="flex:1; padding:8px; background:#d9534f; color:white; border:none; border-radius:4px; font-weight:bold; font-size:12px; cursor:pointer;">📍 Não Loc.</button>
-                                            </div>
-                                        `}
-                                    </div>
-                                </div>
-                                `;
-                            }).join("")}
-                        </div>
-                    </details>
-                    `;
-                }).join("")}
-            `}
-
-            <button onclick="voltarMenuPrincipal()" style="width:100%; padding:12px; background:#6c757d; color:white; border:none; border-radius:6px; margin-top:15px; cursor:pointer; font-weight:bold; font-size:14px;">
-                ↩ Voltar ao Menu
-            </button>
-        </div>
-    `;
-}
-
-// --- ATUALIZAÇÃO DE STATUS NA NUVEM ---
-async function inserirCompraNaRota(idEntrega, nomeRota) {
-    let entregas = JSON.parse(localStorage.getItem("registro_entregas")) || [];
-    let item = entregas.find(e => (e.idEntrega || e.id) == idEntrega);
-
-    if (item) {
-        item.status = "Em Trânsito";
-        localStorage.setItem("registro_entregas", JSON.stringify(entregas));
-
-        try {
-            if (typeof URL_API_GAS !== 'undefined' && URL_API_GAS) {
-                await fetch(URL_API_GAS, {
-                    method: "POST",
-                    mode: "no-cors",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        acao: "atualizarStatusEntrega",
-                        idEntrega: item.idEntrega || item.id,
-                        status: "Em Trânsito"
-                    })
-                });
-            }
-        } catch (e) {
-            console.warn("Erro ao atualizar status na nuvem.", e);
-        }
-
-        abrirAbaMotoristaEntrega(nomeRota || window.lastOpenedRoute); 
-    }
-}
-
-async function mudarStatusEntrega(idEntrega, novoStatus, nomeRota) {
-    let entregas = JSON.parse(localStorage.getItem("registro_entregas")) || [];
-    let entregaEncontrada = entregas.find(e => (e.idEntrega || e.id) == idEntrega);
-    
-    if (entregaEncontrada) {
-        entregaEncontrada.status = novoStatus;
-        
-        if (novoStatus === 'Entregue') {
-            entregaEncontrada.horaFinalizacao = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        }
-        
-        localStorage.setItem("registro_entregas", JSON.stringify(entregas));
-        
-        try {
-            if (typeof URL_API_GAS !== 'undefined' && URL_API_GAS) {
-                await fetch(URL_API_GAS, {
-                    method: "POST",
-                    mode: "no-cors",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        acao: "atualizarStatusEntrega",
-                        idEntrega: entregaEncontrada.idEntrega || entregaEncontrada.id,
-                        status: novoStatus,
-                        horaFinalizacao: entregaEncontrada.horaFinalizacao || ""
-                    })
-                });
-            }
-        } catch (e) {
-            console.warn("Erro ao atualizar status final na nuvem.", e);
-        }
-        
-        alert(`📦 Entrega de ${entregaEncontrada.cliente} marcada como: ${novoStatus}!`);
-        abrirAbaMotoristaEntrega(nomeRota || window.lastOpenedRoute);
-    } else {
-        alert("⚠️ Erro: Entrega não encontrada na base de dados.");
-    }
-}
-
-async function marcarEtiquetaComoEmitida(idEtiqueta) {
-    // 1. Atualiza localmente no navegador se houver lista local
-    let lista = JSON.parse(localStorage.getItem("etiquetas_pendentes")) || [];
-    let atualizado = false;
-    
-    lista.forEach(item => {
-        if (item.id.toString() === idEtiqueta.toString()) {
-            item.status = "EMITIDA";
-            atualizado = true;
-        }
-    });
-    
-    localStorage.setItem("etiquetas_pendentes", JSON.stringify(lista));
-
-    // 2. Envia a atualização para o Google Sheets via URL_API
-    try {
-        if (typeof URL_API !== 'undefined' && URL_API) {
-            await fetch(URL_API, {
-                method: "POST",
-                mode: "no-cors",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    acao: "atualizarStatusEtiqueta",
-                    idEtiqueta: idEtiqueta
-                })
-            });
-            console.log("Status da etiqueta atualizado para EMITIDA na nuvem!");
-        }
-    } catch (e) {
-        console.warn("Erro ao atualizar status da etiqueta na nuvem.", e);
-    }
-    
-    // Recarrega a tela do relatório de etiquetas para atualizar a visualização
-    if (typeof abrirRelatorioEtiquetas === "function") {
-        abrirRelatorioEtiquetas();
-    }
-}
-
