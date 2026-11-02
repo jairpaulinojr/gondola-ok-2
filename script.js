@@ -2180,12 +2180,27 @@ async function buscarClienteCadastro(nomeDigitado) {
         return;
     }
 
-    divSugestoes.innerHTML = data.map(c => `
-  <div onclick="aplicarClienteCadastrado('${c.cliente}', '${c.cidade || ''}', '${c.bairro || ''}', '${c.rua || ''}', '${c.numero || ''}', '${c.apartamento || 'Não'}', '${c.apartamentoDetalhe || ''}')" 
-             style="padding:12px; border-bottom:1px solid #eee; cursor:pointer; background:#fffbf0; font-weight:bold; color:#333;">
-             👤 ${c.cliente} <br><span style="font-size:11px; color:#777;">📍 ${c.rua || ''}, Nº ${c.numero || ''} - ${c.bairro || ''}</span>
-        </div>
-    `).join("");
+    function renderizarSugestoesClientes(resultados) {
+    let divSugestoes = document.getElementById("sugestoes_clientes");
+    if (!divSugestoes) return;
+
+    divSugestoes.innerHTML = resultados.map(c => {
+        let cliente = c.cliente || '';
+        let cidade = c.cidade || '';
+        let bairro = c.bairro || '';
+        let rua = c.rua || '';
+        let numero = c.numero || '';
+        let apto = c.apartamento || 'Não';
+        let aptoDet = c.apartamentoDetalhe || '';
+
+        return `
+            <div onclick="aplicarClienteCadastrado('${cliente}', '${cidade}', '${bairro}', '${rua}', '${numero}', '${apto}', '${aptoDet}')" 
+                 style="padding:12px; border-bottom:1px solid #eee; cursor:pointer; background:#fffbf0; font-weight:bold; color:#333;">
+                 👤 ${cliente} <br>
+                 <span style="font-size:11px; color:#777;">📍 ${rua}, Nº ${numero} - ${bairro} (${cidade})</span>
+            </div>
+        `;
+    }).join("");
 }
 
 function aplicarClienteCadastrado(nome, cidade, bairro, rua, numero, apto, aptoDet) {
