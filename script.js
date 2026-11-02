@@ -2181,9 +2181,9 @@ async function buscarClienteCadastro(nomeDigitado) {
     }
 
     divSugestoes.innerHTML = data.map(c => `
-        <div onclick="aplicarClienteCadastrado('${c.cliente}', '${c.cidade \vert{}\vert{} ''}', '${c.bairro || ''}', '${c.rua \vert{}\vert{} ''}', '${c.numero || ''}', '${c.apartamento \vert{}\vert{} 'Não'}', '${c.apartamentoDetalhe || ''}')" 
+  <div onclick="aplicarClienteCadastrado('${c.cliente}', '${c.cidade || ''}', '${c.bairro || ''}', '${c.rua || ''}', '${c.numero || ''}', '${c.apartamento || 'Não'}', '${c.apartamentoDetalhe || ''}')" 
              style="padding:12px; border-bottom:1px solid #eee; cursor:pointer; background:#fffbf0; font-weight:bold; color:#333;">
-             👤 ${c.cliente} <br><span style="font-size:11px; color:#777;">📍 ${c.rua || ''}, Nº ${c.numero \vert{}\vert{} ''} -${c.bairro || ''}</span>
+             👤 ${c.cliente} <br><span style="font-size:11px; color:#777;">📍 ${c.rua || ''}, Nº ${c.numero || ''} - ${c.bairro || ''}</span>
         </div>
     `).join("");
 }
