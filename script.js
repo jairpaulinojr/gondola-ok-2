@@ -956,7 +956,10 @@ function abrirMenuSetoresGerente() {
 // 13. GERENTE: FILA COM ITENS COM RUPTURA ATIVA - NUVEM / GOOGLE SHEETS
 // ==========================================
 async function abrirAbaGerente(setorFiltro) {
-    document.querySelector(".container").innerHTML = `
+    let container = document.querySelector(".container");
+    if (!container) return;
+
+    container.innerHTML = `
         <div class="topo">
             <h1>🚨 RUPTURAS: ${setorFiltro.toUpperCase()}</h1>
             <p>Carregando dados da nuvem...</p>
@@ -968,10 +971,12 @@ async function abrirAbaGerente(setorFiltro) {
 
     let dados = [];
     try {
-        let resposta = await fetch(`${URL_API_GAS}?acao=listarRupturas&setor=${encodeURIComponent(setorFiltro)}`);
-        let resultado = await resposta.json();
-        if (resultado && resultado.rupturas) {
-            dados = resultado.rupturas;
+        if (typeof URL_API_GAS !== 'undefined' && URL_API_GAS) {
+            let resposta = await fetch(`${URL_API_GAS}?acao=listarRupturas&setor=${encodeURIComponent(setorFiltro)}`);
+            let resultado = await resposta.json();
+            if (resultado && resultado.rupturas) {
+                dados = resultado.rupturas;
+            }
         }
     } catch (e) {
         let localDados = JSON.parse(localStorage.getItem("gondola_dados")) || [];
@@ -985,12 +990,21 @@ async function abrirAbaGerente(setorFiltro) {
         linesTabela = `<tr><td colspan="3" style="padding:30px; text-align:center; color:green; font-weight:bold; font-size:14px;">🎉 Excelente! Nenhuma ruptura pendente neste setor.</td></tr>`;
     } else {
         rupturasPendentesSetor.forEach(p => {
-            let idFormatado = String(p.id).replace('.', '_');
+            let idProd = String(p.id || '').replace(/\./g, '_');
+            let desc = p.descricao || p.PRODUTO || 'Produto sem descrição';
+            let cod = p.codigo || p['codigo de barras'] || '-';
+            let dataAud = p.dataAuditoria || '';
+            let op = p.operador || '';
+
             linesTabela += `
                 <tr style="border-bottom: 1px solid #ddd; font-size: 13px;">
-                    <td style="padding: 12px;"><strong>${p.descricao}</strong><br><small style="color:#555;">Cód: ${p.codigo}</small><br><span style="font-size:10px; color:#777;">Auditado em: ${p.dataAuditoria || ''} por ${p.operador || ''}</span></td>
+                    <td style="padding: 12px;">
+                        <strong>${desc}</strong><br>
+                        <small style="color:#555;">Cód: ${cod}</small><br>
+                        <span style="font-size:10px; color:#777;">Auditado em: ${dataAud} por ${op}</span>
+                    </td>
                     <td style="padding: 12px; text-align:center; vertical-align:middle;">
-                        <select id="motivo-${idFormatado}" style="padding: 6px; font-size:12px; width: 100%; border:1px solid #ccc; border-radius:4px;">
+                        <select id="motivo-${idProd}" style="padding: 6px; font-size:12px; width: 100%; border:1px solid #ccc; border-radius:4px;">
                             <option value="Não Informado">Definir motivo...</option>
                             <option value="Estoque Zerado">❌ Estoque Zerado</option>
                             <option value="Não Abastecido">⚠️ Não Abastecido</option>
@@ -998,14 +1012,14 @@ async function abrirAbaGerente(setorFiltro) {
                         </select>
                     </td>
                     <td style="padding: 12px; text-align:center; vertical-align:middle; width:70px;">
-                        <button onclick="salvarResolucaoRupturaNuvem('${setorFiltro}', '${p.id}')" style="background:#28a745; color:white; border:none; padding:8px 10px; font-size:12px; font-weight:bold; border-radius:4px; cursor:pointer;">✓ Ok</button>
+                        <button onclick="salvarResolucaoRupturaNuvem('${setorFiltro}', '${idProd}')" style="background:#28a745; color:white; border:none; padding:8px 10px; font-size:12px; font-weight:bold; border-radius:4px; cursor:pointer;">✓ Ok</button>
                     </td>
                 </tr>
             `;
         });
     }
 
-    document.querySelector(".container").innerHTML = `
+    container.innerHTML = `
         <div class="topo">
             <h1>🚨 RUPTURAS: ${setorFiltro.toUpperCase()}</h1>
             <p>Painel focado exclusivamente em ações corretivas</p>
