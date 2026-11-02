@@ -4,6 +4,16 @@ const SUPABASE_URL = "https://jylcmvoynmmyvlpnkkhj.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_q3f4KYC25_TyGmUhY2x5Lg_biiO4j8h";
 
 const supabaseClient = typeof supabase !== 'undefined' ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+window.addEventListener('DOMContentLoaded', () => {
+    console.log("DOM carregado com sucesso!");
+    if (typeof mostrarTelaLoginInicial === "function") {
+        mostrarTelaLoginInicial();
+    } else {
+        document.querySelector(".container").innerHTML = "<h1>Erro: Função de login não encontrada</h1>";
+    }
+});
+
+
 
 // --- FUNÇÃO PARA SALVAR NA NUVEM E LOCALMENTE ---
 async function salvarDiaDaGestaoNoHist() {
