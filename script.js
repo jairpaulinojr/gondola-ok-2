@@ -1,22 +1,25 @@
+// --- ARRANQUE SEGURO DA APLICAÇÃO ---
 window.addEventListener('DOMContentLoaded', () => {
     if (typeof mostrarTelaLoginInicial === "function") {
         mostrarTelaLoginInicial();
     }
 });
 
-// --- CONFIGURAÇÃO DA API ---
 // --- CONFIGURAÇÃO DO SUPABASE ---
 const SUPABASE_URL = "https://jylcmvoynmmyvlpnkkhj.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_q3f4KYC25_TyGmUhY2x5Lg_biiO4j8h";
 
-// Usa 'supabaseClient' para evitar conflito com a biblioteca global 'supabase'
+// Usamos 'supabaseClient' para evitar conflito com a biblioteca global
 const supabaseClient = (typeof supabase !== 'undefined' && supabase.createClient) 
     ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 
     : null;
+
+// --- FUNÇÃO PARA SALVAR O DIA DA GESTÃO ---
+async function salvarDiaDaGestaoNoHist() {
     let historico = JSON.parse(localStorage.getItem("gondola_historico_checklists")) || [];
 
     let analiseGestao = {
-        acao: "salvarDiaDaGestao", // Adicionado para a nuvem identificar a ação se necessário
+        acao: "salvarDiaDaGestao",
         idSessao: Date.now(),
         setor: "Checklist Operacional",
         tipoMissao: "DIA_GESTAO",
@@ -38,7 +41,7 @@ const supabaseClient = (typeof supabase !== 'undefined' && supabase.createClient
     historico.push(analiseGestao);
     localStorage.setItem("gondola_historico_checklists", JSON.stringify(historico));
 
-    // 2. Envia para o Google Sheets via API usando a variável correta URL_API
+    // 2. Envia para a nuvem via API se a variável estiver definida
     try {
         if (typeof URL_API !== 'undefined' && URL_API) {
             await fetch(URL_API, {
