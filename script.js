@@ -9,10 +9,10 @@ window.addEventListener('DOMContentLoaded', () => {
 const SUPABASE_URL = "https://jylcmvoynmmyvlpnkkhj.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_q3f4KYC25_TyGmUhY2x5Lg_biiO4j8h";
 
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-// --- FUNÇÃO PARA SALVAR NA NUVEM E LOCALMENTE ---
-async function salvarDiaDaGestaoNoHist() {
+// Usa 'supabaseClient' para evitar conflito com a biblioteca global 'supabase'
+const supabaseClient = (typeof supabase !== 'undefined' && supabase.createClient) 
+    ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 
+    : null;
     let historico = JSON.parse(localStorage.getItem("gondola_historico_checklists")) || [];
 
     let analiseGestao = {
