@@ -3,106 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GÔNDOLA OK</title>
+    <title>Gôndola OK - Operacional</title>
+    
+    <!-- Biblioteca Oficial do Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <style>
-        *{
-            margin:0;
-            padding:0;
-            box-sizing:border-box;
-            font-family:Arial, Helvetica, sans-serif;
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
         }
-
-        body{
-            background:#f2f2f2;
-            padding:15px;
-        }
-
-        .container{
-            max-width:450px;
-            margin:auto;
-            background:#fff;
-            border-radius:10px;
-            padding:15px;
-            box-shadow:0 2px 10px rgba(0,0,0,.15);
-        }
-
-        .topo{
-            background:#0d6efd;
-            color:#fff;
-            padding:15px;
-            border-radius:8px;
-            text-align:center;
-            margin-bottom:15px;
-        }
-
-        .topo h1{
-            font-size:22px;
-            margin-bottom:5px;
-        }
-
-        .topo p{
-            font-size:13px;
-        }
-
-        .login{
-            width:100%;
-        }
-
-        .login input,
-        .login select{
-            width:100%;
-            padding:10px;
-            margin:6px 0;
-            border:1px solid #ccc;
-            border-radius:5px;
-            font-size:15px;
-        }
-
-        .login button{
-            width:100%;
-            padding:12px;
-            margin-top:8px;
-            border:none;
-            border-radius:5px;
-            cursor:pointer;
-            font-size:15px;
-            font-weight:bold;
-        }
-
-        table{
-            width:100%;
-        }
-
-        td,th{
-            word-break:break-word;
-        }
-
-        svg{
-            max-width:100%;
+        .container {
+            width: 100%;
+            max-width: 450px;
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+            margin: 10px;
         }
     </style>
 </head>
-
 <body>
 
-<div class="container"></div>
+    <div class="container">
+        <!-- O script.js vai preencher este espaço automaticamente ao carregar -->
+        <div style="padding: 40px; text-align: center; color: #6c757d;">
+            <h2>⏳ A carregar aplicação...</h2>
+        </div>
+    </div>
 
-<!-- Bibliotecas externas -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://unpkg.com/html5-qrcode"></script>
-<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-
-<!-- Conexão SDK do Supabase -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-<!-- Configuração da URL da Nuvem (Google Apps Script) -->
-<script>
-    const URL_API_GAS = "https://script.google.com/macros/s/AKfycbykcWGN0f38oAR5wwgkuVLaCaBv0baDK4uCODUg3Cf9Fpa3i3-VQAnzdiGpVdfnan99/exec";
-</script>
-
-<!-- Script principal da aplicação -->
-<script src="script.js"></script>
-
+    <!-- Script Principal da Aplicação -->
+    <script src="script.js"></script>
+    <script>
+        // Garante que o menu principal abre assim que a página carrega
+        window.onload = function() {
+            if (typeof voltarMenuPrincipal === "function") {
+                voltarMenuPrincipal();
+            } else {
+                document.querySelector(".container").innerHTML = "<h3 style='color:red; text-align:center;'>Erro: Função voltarMenuPrincipal não encontrada no script.js</h3>";
+            }
+        };
+    </script>
 </body>
 </html>
