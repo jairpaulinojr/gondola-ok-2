@@ -1,8 +1,8 @@
 // ==========================================
 // 1. INICIALIZAÇÃO E CONEXÃO COM O SUPABASE
 // ==========================================
-const SUPABASE_URL = 'SUA_URL_DO_SUPABASE'; // Substitua pela sua URL real se ainda não estiver configurada no topo
-const SUPABASE_ANON_KEY = 'SUA_CHAVE_ANON_DO_SUPABASE'; // Substitua pela sua chave real
+const SUPABASE_URL = 'https://seu-projeto.supabase.co'; // Cole aqui a sua URL real do Supabase
+const SUPABASE_ANON_KEY = 'sua-chave-anon-aqui'; // Cole aqui a sua chave anon real
 
 let supabaseClient = null;
 if (window.supabase) {
