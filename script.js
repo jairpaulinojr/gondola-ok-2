@@ -30,7 +30,7 @@ function voltarMenuPrincipal() {
 
 
 // ==========================================
-// 2. FUNÇÃO AUXILIAR DE BUSCA GLOBAL
+// 2. FUNÇÃO AUXILIAR DE BUSCA GLOBAL (CORRIGIDA)
 // ==========================================
 async function buscarProdutoSupabase(codigoBarras) {
     let codigoLimpo = codigoBarras ? String(codigoBarras).trim() : "";
@@ -40,14 +40,23 @@ async function buscarProdutoSupabase(codigoBarras) {
         let { data, error } = await supabaseClient
             .from('cadastro_global')
             .select('*')
-            .eq('CODIGO DE BARRAS', codigoLimpo)
-            .single();
+            .eq('CODIGO DE BARRAS', codigoLimpo);
 
-        if (error || !data) return null;
+        if (error || !data || data.length === 0) {
+            let { data: dataAlt, error: errorAlt } = await supabaseClient
+                .from('cadastro_global')
+                .select('*')
+                .textSearch('CODIGO DE BARRAS', codigoLimpo);
+                
+            if (errorAlt || !dataAlt || dataAlt.length === 0) return null;
+            data = dataAlt;
+        }
+
+        let produtoEncontrado = data[0];
 
         return {
-            codigo: data['CODIGO DE BARRAS'],
-            descricao: data['PRODUTO'] || "Produto sem descrição"
+            codigo: produtoEncontrado['CODIGO DE BARRAS'] || codigoLimpo,
+            descricao: produtoEncontrado['PRODUTO'] || "Produto sem descrição"
         };
     } catch (e) {
         console.error("Erro ao buscar no cadastro_global:", e);
