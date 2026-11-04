@@ -1,8 +1,8 @@
 // ==========================================
 // 1. INICIALIZAÇÃO E CONEXÃO COM O SUPABASE
 // ==========================================
-const SUPABASE_URL = 'https://seu-projeto.supabase.co'; // Cole aqui a sua URL real do Supabase
-const SUPABASE_ANON_KEY = 'sua-chave-anon-aqui'; // Cole aqui a sua chave anon real
+const SUPABASE_URL = 'https://jylcmvoynmmyvlpnkkhi.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5bGNtdm95bW5teXZscG5ra2hpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM1OTc4MDUsImV4cCI6MjEwOTE3MzgwNX0.DrMpI6lzyGx6-PBMPMEK1NWkBB7MsQol7NmaXpZc24w';
 
 let supabaseClient = null;
 if (window.supabase) {
@@ -222,7 +222,7 @@ async function gerarSolicitacaoEtiqueta(codigo, descricao) {
 
 
 // ==========================================
-// 5. MÓDULO DE ENTREGAS (ALINHADO ÀS COLUNAS REAIS)
+// 5. MÓDULO DE ENTREGAS
 // ==========================================
 function abrirMonitoramentoEntregas() {
     let container = document.querySelector(".container");
