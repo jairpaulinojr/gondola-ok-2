@@ -474,3 +474,31 @@ async function executarPesquisaMissoes() {
     html += `</table>`;
     containerResultado.innerHTML = html;
 }
+
+async function buscarProdutoSupabase(codigoBarras) {
+    let codigoLimpo = codigoBarras ? String(codigoBarras).trim() : "";
+    console.log("A procurar pelo código:", codigoLimpo);
+    
+    if (!codigoLimpo || !supabaseClient) return null;
+
+    try {
+        let { data, error } = await supabaseClient
+            .from('cadastro_global')
+            .select('*')
+            .eq('CODIGO DE BARRAS', codigoLimpo);
+
+        console.log("Resposta do Supabase:", data, "Erro:", error);
+
+        if (error || !data || data.length === 0) return null;
+
+        let produtoEncontrado = data[0];
+        return {
+            codigo: produtoEncontrado['CODIGO DE BARRAS'] || codigoLimpo,
+            descricao: produtoEncontrado['PRODUTO'] || "Produto sem descrição"
+        };
+    } catch (e) {
+        console.error("Erro na excepção da busca:", e);
+        return null;
+    }
+}
+
