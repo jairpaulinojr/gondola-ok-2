@@ -37,31 +37,27 @@ async function buscarProdutoSupabase(codigoBarras) {
     if (!codigoLimpo || !supabaseClient) return null;
 
     try {
-        // Consulta na tabela correta: 'cadastro_global'
         let { data, error } = await supabaseClient
             .from('cadastro_global')
             .select('*')
             .eq('CODIGO DE BARRAS', codigoLimpo);
 
-        if (error || !data || data.length === 0) {
-            // Tenta buscar por equivalência numérica caso a coluna seja do tipo número
-            let { data: dataAlt, error: errorAlt } = await supabaseClient
-                .from('cadastro_global')
-                .select('*')
-                .eq('CODIGO DE BARRAS', Number(codigoLimpo));
+        if (error) {
+            console.error("Erro do Supabase:", error);
+            return null;
+        }
 
-            if (errorAlt || !dataAlt || dataAlt.length === 0) return null;
-            data = dataAlt;
+        if (!data || data.length === 0) {
+            return null;
         }
 
         let produtoEncontrado = data[0];
-
         return {
             codigo: produtoEncontrado['CODIGO DE BARRAS'] || codigoLimpo,
             descricao: produtoEncontrado['PRODUTO'] || "Produto sem descrição"
         };
     } catch (e) {
-        console.error("Erro ao buscar no cadastro_global:", e);
+        console.error("Erro de excepção:", e);
         return null;
     }
 }
@@ -412,7 +408,7 @@ async function buscarNaTabelaGlobalAvancada(filtroLoja, filtroSetor, termoProdut
         if (filtroSetor && filtroSetor.trim() !== "") {
             query = query.ilike('setor', `%${filtroSetor.trim()}%`);
         }
-        if (termoproduto && termoProduto.trim() !== "") {
+        if (termoProduto && termoProduto.trim() !== "") {
             query = query.ilike('descricao', `%${termoProduto.trim()}%`);
         }
 
@@ -474,31 +470,3 @@ async function executarPesquisaMissoes() {
     html += `</table>`;
     containerResultado.innerHTML = html;
 }
-
-async function buscarProdutoSupabase(codigoBarras) {
-    let codigoLimpo = codigoBarras ? String(codigoBarras).trim() : "";
-    console.log("A procurar pelo código:", codigoLimpo);
-    
-    if (!codigoLimpo || !supabaseClient) return null;
-
-    try {
-        let { data, error } = await supabaseClient
-            .from('cadastro_global')
-            .select('*')
-            .eq('CODIGO DE BARRAS', codigoLimpo);
-
-        console.log("Resposta do Supabase:", data, "Erro:", error);
-
-        if (error || !data || data.length === 0) return null;
-
-        let produtoEncontrado = data[0];
-        return {
-            codigo: produtoEncontrado['CODIGO DE BARRAS'] || codigoLimpo,
-            descricao: produtoEncontrado['PRODUTO'] || "Produto sem descrição"
-        };
-    } catch (e) {
-        console.error("Erro na excepção da busca:", e);
-        return null;
-    }
-}
-
