@@ -30,24 +30,26 @@ function voltarMenuPrincipal() {
 
 
 // ==========================================
-// 2. FUNÇÃO AUXILIAR DE BUSCA GLOBAL (CORRIGIDA)
+// 2. FUNÇÃO AUXILIAR DE BUSCA GLOBAL
 // ==========================================
 async function buscarProdutoSupabase(codigoBarras) {
     let codigoLimpo = codigoBarras ? String(codigoBarras).trim() : "";
     if (!codigoLimpo || !supabaseClient) return null;
 
     try {
+        // Consulta na tabela correta: 'cadastro_global'
         let { data, error } = await supabaseClient
             .from('cadastro_global')
             .select('*')
             .eq('CODIGO DE BARRAS', codigoLimpo);
 
         if (error || !data || data.length === 0) {
+            // Tenta buscar por equivalência numérica caso a coluna seja do tipo número
             let { data: dataAlt, error: errorAlt } = await supabaseClient
                 .from('cadastro_global')
                 .select('*')
-                .textSearch('CODIGO DE BARRAS', codigoLimpo);
-                
+                .eq('CODIGO DE BARRAS', Number(codigoLimpo));
+
             if (errorAlt || !dataAlt || dataAlt.length === 0) return null;
             data = dataAlt;
         }
@@ -410,7 +412,7 @@ async function buscarNaTabelaGlobalAvancada(filtroLoja, filtroSetor, termoProdut
         if (filtroSetor && filtroSetor.trim() !== "") {
             query = query.ilike('setor', `%${filtroSetor.trim()}%`);
         }
-        if (termoProduto && termoProduto.trim() !== "") {
+        if (termoproduto && termoProduto.trim() !== "") {
             query = query.ilike('descricao', `%${termoProduto.trim()}%`);
         }
 
