@@ -21,39 +21,8 @@
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
 
-    <!-- TELA DE LOGIN E SELEÇÃO DE PERFIL -->
-    <div id="login-screen" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 space-y-6">
-            <div class="text-center space-y-2">
-                <div class="inline-flex items-center justify-center w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl text-2xl font-bold mb-2">
-                    <i class="fa-solid fa-store"></i>
-                </div>
-                <h1 class="text-2xl font-bold text-slate-900">Gôndola OK</h1>
-                <p class="text-sm text-slate-500">Gestão Operacional de Chão de Loja</p>
-            </div>
-            <form id="login-form" class="space-y-4">
-                <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Selecione o Perfil</label>
-                    <select id="user-role" class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white font-medium">
-                        <option value="admin">Gerente / Administrador</option>
-                        <option value="fiscal">Fiscal de Caixa</option>
-                        <option value="motorista">Motorista / Entregas</option>
-                        <option value="repositor">Repositor / Operacional</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Nome do Operador</label>
-                    <input type="text" id="user-name" required placeholder="Digite seu nome..." class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
-                </div>
-                <button type="submit" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-600/20 transition-all">
-                    Acessar Sistema
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <!-- APLICAÇÃO PRINCIPAL -->
-    <div id="app-container" class="flex-1 flex flex-col hidden-section">
+    <!-- APLICAÇÃO PRINCIPAL (JÁ ENTRA DIRETO NO MODO MASTER) -->
+    <div id="app-container" class="flex-1 flex flex-col">
         <!-- HEADER -->
         <header class="bg-slate-900 text-white shadow-md sticky top-0 z-40">
             <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -63,12 +32,12 @@
                     </div>
                     <div>
                         <h2 class="font-bold text-lg leading-tight">Gôndola OK</h2>
-                        <span id="header-user-badge" class="text-xs text-emerald-400 font-medium">Perfil: Admin</span>
+                        <span id="header-user-badge" class="text-xs text-emerald-400 font-medium">Perfil: ADMINISTRADOR MASTER</span>
                     </div>
                 </div>
-                <button onclick="logout()" class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-lg border border-slate-700 transition">
-                    <i class="fa-solid fa-right-from-bracket mr-1"></i> Sair
-                </button>
+                <div class="text-xs bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 px-3 py-1.5 rounded-lg font-semibold">
+                    <i class="fa-solid fa-shield-halved mr-1"></i> Acesso Master Ativo
+                </div>
             </div>
             <!-- MENU DE NAVEGAÇÃO POR ABAS -->
             <nav class="bg-slate-800 border-t border-slate-700 overflow-x-auto">
@@ -137,9 +106,9 @@
             <!-- ABA 2: ENTREGAS & ROTAS -->
             <section id="tab-entregas" class="tab-content hidden-section space-y-6">
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <!-- Formulário do Fiscal -->
+                    <!-- Formulário de Agendamento -->
                     <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 lg:col-span-1 space-y-4">
-                        <h3 class="text-lg font-bold text-slate-900 border-b pb-3">Agendar Entrega (Fiscal)</h3>
+                        <h3 class="text-lg font-bold text-slate-900 border-b pb-3">Agendar Entrega</h3>
                         <form id="form-entrega" class="space-y-3" onsubmit="salvarEntrega(event)">
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 mb-1">Nome do Cliente (Autocompletar)</label>
@@ -290,7 +259,9 @@
 
     <!-- JAVASCRIPT DA APLICAÇÃO -->
     <script>
-        let currentUser = null;
+        // Inicialização automática direto no modo Administrador Master
+        let currentUser = { role: 'admin', name: 'Administrador Master' };
+        
         let produtos = JSON.parse(localStorage.getItem('gondola_produtos')) || [
             { ean: '7891000100103', nome: 'Uísque Importado 8 Anos 750ml' },
             { ean: '7891024050012', nome: 'Cerveja Pilsen Lata 350ml' },
@@ -304,25 +275,10 @@
         ];
         let dadosFinanceiros = JSON.parse(localStorage.getItem('gondola_fin')) || { vendas: 45800, quebras: 420 };
 
-        document.getElementById('login-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const role = document.getElementById('user-role').value;
-            const name = document.getElementById('user-name').value;
-            currentUser = { role, name };
-            
-            document.getElementById('login-screen').classList.add('hidden-section');
-            document.getElementById('app-container').classList.remove('hidden-section');
-            document.getElementById('header-user-badge').innerText = `Perfil: ${role.toUpperCase()} (${name})`;
-
-            if (role !== 'admin') {
-                document.getElementById('tab-admin-btn').style.display = 'none';
-            } else {
-                document.getElementById('tab-admin-btn').style.display = 'block';
-            }
+        // Executa assim que a página carrega
+        window.addEventListener('DOMContentLoaded', () => {
             renderizarTudo();
         });
-
-        function logout() { location.reload(); }
 
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden-section'));
