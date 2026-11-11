@@ -3,53 +3,582 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gôndola OK - Operacional</title>
-    
-    <!-- Biblioteca Oficial do Supabase -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
+    <title>Gôndola OK - Gestão de Supermercados</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f6f9;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-        .container {
-            width: 100%;
-            max-width: 450px;
-            background: #ffffff;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            overflow: hidden;
-            margin: 10px;
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .hidden-section { display: none; }
+        @media print {
+            body * { visibility: hidden; }
+            #print-area, #print-area * { visibility: visible; }
+            #print-area { position: absolute; left: 0; top: 0; width: 100%; }
         }
     </style>
 </head>
-<body>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
 
-    <div class="container">
-        <!-- O script.js vai preencher este espaço automaticamente ao carregar -->
-        <div style="padding: 40px; text-align: center; color: #6c757d;">
-            <h2>⏳ A carregar aplicação...</h2>
+    <!-- TELA DE LOGIN E SELEÇÃO DE PERFIL -->
+    <div id="login-screen" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 space-y-6">
+            <div class="text-center space-y-2">
+                <div class="inline-flex items-center justify-center w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl text-2xl font-bold mb-2">
+                    <i class="fa-solid fa-store"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-slate-900">Gôndola OK</h1>
+                <p class="text-sm text-slate-500">Gestão Operacional de Chão de Loja</p>
+            </div>
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Selecione o Perfil</label>
+                    <select id="user-role" class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white font-medium">
+                        <option value="admin">Gerente / Administrador</option>
+                        <option value="fiscal">Fiscal de Caixa</option>
+                        <option value="motorista">Motorista / Entregas</option>
+                        <option value="repositor">Repositor / Operacional</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Nome do Operador</label>
+                    <input type="text" id="user-name" required placeholder="Digite seu nome..." class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                </div>
+                <button type="submit" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-600/20 transition-all">
+                    Acessar Sistema
+                </button>
+            </form>
         </div>
     </div>
 
-    <!-- Script Principal da Aplicação -->
-    <script src="script.js"></script>
+    <!-- APLICAÇÃO PRINCIPAL -->
+    <div id="app-container" class="flex-1 flex flex-col hidden-section">
+        <!-- HEADER -->
+        <header class="bg-slate-900 text-white shadow-md sticky top-0 z-40">
+            <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-emerald-500 text-slate-900 p-2 rounded-xl font-bold">
+                        <i class="fa-solid fa-basket-shopping text-lg"></i>
+                    </div>
+                    <div>
+                        <h2 class="font-bold text-lg leading-tight">Gôndola OK</h2>
+                        <span id="header-user-badge" class="text-xs text-emerald-400 font-medium">Perfil: Admin</span>
+                    </div>
+                </div>
+                <button onclick="logout()" class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-lg border border-slate-700 transition">
+                    <i class="fa-solid fa-right-from-bracket mr-1"></i> Sair
+                </button>
+            </div>
+            <!-- MENU DE NAVEGAÇÃO POR ABAS -->
+            <nav class="bg-slate-800 border-t border-slate-700 overflow-x-auto">
+                <div class="max-w-7xl mx-auto px-4 flex space-x-2 py-2">
+                    <button onclick="switchTab('global')" class="nav-tab px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap bg-emerald-600 text-white transition">
+                        <i class="fa-solid fa-database mr-2"></i>Cadastro Global & Etiquetas
+                    </button>
+                    <button onclick="switchTab('entregas')" class="nav-tab px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap text-slate-300 hover:bg-slate-700 transition">
+                        <i class="fa-solid fa-truck-fast mr-2"></i>Entregas & Rotas
+                    </button>
+                    <button onclick="switchTab('perdas')" class="nav-tab px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap text-slate-300 hover:bg-slate-700 transition">
+                        <i class="fa-solid fa-triangle-exclamation mr-2"></i>Prevenção de Perdas
+                    </button>
+                    <button onclick="switchTab('checklist')" class="nav-tab px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap text-slate-300 hover:bg-slate-700 transition">
+                        <i class="fa-solid fa-clipboard-check mr-2"></i>Checklist Operacional
+                    </button>
+                    <button id="tab-admin-btn" onclick="switchTab('admin')" class="nav-tab px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap text-slate-300 hover:bg-slate-700 transition">
+                        <i class="fa-solid fa-chart-pie mr-2"></i>Painel Gestor (Admin)
+                    </button>
+                </div>
+            </nav>
+        </header>
+
+        <!-- CONTEÚDO PRINCIPAL -->
+        <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
+
+            <!-- ABA 1: BASE GLOBAL & ETIQUETAS A4 -->
+            <section id="tab-global" class="tab-content space-y-6">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                        <div>
+                            <h3 class="text-xl font-bold text-slate-900">Base Global Enxuta (EAN e Descrição)</h3>
+                            <p class="text-sm text-slate-500">Consulta de produtos, exportação .CSV e impressor de etiquetas A4 (20 por folha).</p>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="abrirModalProduto()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold transition">
+                                <i class="fa-solid fa-plus mr-1"></i> Novo Produto
+                            </button>
+                            <button onclick="exportarExcelProdutos()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-sm font-semibold transition">
+                                <i class="fa-solid fa-file-excel mr-1"></i> Exportar (.csv)
+                            </button>
+                            <button onclick="gerarEtiquetasA4()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition">
+                                <i class="fa-solid fa-barcode mr-1"></i> Gerar Etiquetas A4
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <input type="text" id="filtro-produto" onkeyup="filtrarProdutos()" placeholder="Pesquisar por Código EAN ou Descrição do Produto..." class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                    <div class="overflow-x-auto rounded-xl border border-slate-200">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-700 text-xs uppercase tracking-wider border-b border-slate-200">
+                                    <th class="p-3">Sel.</th>
+                                    <th class="p-3">Código EAN</th>
+                                    <th class="p-3">Descrição do Produto</th>
+                                    <th class="p-3 text-right">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lista-produtos" class="divide-y divide-slate-200 text-sm"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 2: ENTREGAS & ROTAS -->
+            <section id="tab-entregas" class="tab-content hidden-section space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Formulário do Fiscal -->
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 lg:col-span-1 space-y-4">
+                        <h3 class="text-lg font-bold text-slate-900 border-b pb-3">Agendar Entrega (Fiscal)</h3>
+                        <form id="form-entrega" class="space-y-3" onsubmit="salvarEntrega(event)">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Nome do Cliente (Autocompletar)</label>
+                                <input type="text" id="ent-nome" required oninput="buscarClienteCadastrado(this.value)" placeholder="Digite o primeiro nome..." class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Telefone / WhatsApp</label>
+                                <input type="text" id="ent-fone" required placeholder="(00) 00000-0000" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Cidade / Rota</label>
+                                <input type="text" id="ent-cidade" required placeholder="Ex: Centro / Alto Jequitibá" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Endereço (Rua e Número/Apto)</label>
+                                <input type="text" id="ent-rua" required placeholder="Ex: Rua Principal, 120" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Volumes / Pedido</label>
+                                <input type="text" id="ent-volumes" required placeholder="Ex: 2 caixas" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
+                            </div>
+                            <button type="submit" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold transition">
+                                Salvar e Agendar Entrega
+                            </button>
+                        </form>
+                    </div>
+                    <!-- Painel de Rotas e Ações -->
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 lg:col-span-2 space-y-4">
+                        <div class="flex justify-between items-center border-b pb-3">
+                            <h3 class="text-lg font-bold text-slate-900">Painel de Expedição e Rotas (GPS & Whats)</h3>
+                            <button onclick="exportarEntregasExcel()" class="text-xs bg-slate-200 hover:bg-slate-300 px-3 py-1.5 rounded-lg font-semibold">
+                                <i class="fa-solid fa-file-excel mr-1"></i> Exportar (.csv)
+                            </button>
+                        </div>
+                        <div id="painel-rotas" class="space-y-3"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 3: PREVENÇÃO DE PERDAS & INVENTÁRIO -->
+            <section id="tab-perdas" class="tab-content hidden-section space-y-6">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                    <div class="flex justify-between items-center border-b pb-3">
+                        <div>
+                            <h3 class="text-xl font-bold text-slate-900">Módulo de Prevenção de Perdas & Inventário</h3>
+                            <p class="text-sm text-slate-500">Contagem rápida de itens sensíveis (Ex: Bebidas Finas) com verificação de sobras/faltas.</p>
+                        </div>
+                        <button onclick="iniciarNovoInventario()" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-semibold transition">
+                            <i class="fa-solid fa-calculator mr-1"></i> Novo Balanço
+                        </button>
+                    </div>
+                    <div id="container-inventario" class="space-y-4">
+                        <div class="p-6 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-center text-slate-500">
+                            Nenhum inventário ativo. Clique em "Novo Balanço" para iniciar a contagem rápida de estoque.
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 4: CHECKLIST OPERACIONAL -->
+            <section id="tab-checklist" class="tab-content hidden-section space-y-6">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                    <div class="flex justify-between items-center border-b pb-3">
+                        <div>
+                            <h3 class="text-xl font-bold text-slate-900">Checklist Operacional de Chão de Loja</h3>
+                            <p class="text-sm text-slate-500">Acompanhamento de rotinas operacionais por setor.</p>
+                        </div>
+                        <button onclick="exportarChecklistExcel()" class="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-sm font-semibold">
+                            <i class="fa-solid fa-file-excel mr-1"></i> Exportar (.csv)
+                        </button>
+                    </div>
+                    <div class="space-y-3" id="lista-checklist"></div>
+                </div>
+            </section>
+
+            <!-- ABA 5: PAINEL ADMINISTRATIVO -->
+            <section id="tab-admin" class="tab-content hidden-section space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-2">
+                        <span class="text-xs font-bold text-slate-400 uppercase">Faturamento do Período</span>
+                        <h4 id="dash-vendas" class="text-3xl font-extrabold text-slate-900">R$ 0,00</h4>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-2">
+                        <span class="text-xs font-bold text-slate-400 uppercase">Quebras e Perdas Registradas</span>
+                        <h4 id="dash-quebras" class="text-3xl font-extrabold text-rose-600">R$ 0,00</h4>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-2">
+                        <span class="text-xs font-bold text-slate-400 uppercase">Aproveitamento da Operação</span>
+                        <h4 id="dash-indice" class="text-3xl font-extrabold text-emerald-600">100%</h4>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                    <h3 class="text-lg font-bold text-slate-900 border-b pb-3">Fechamento e Indicadores</h3>
+                    <form id="form-financeiro" onsubmit="salvarFechamentoGerencial(event)" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Vendas (R$)</label>
+                            <input type="number" step="0.01" id="val-vendas" required class="w-full px-3 py-2 rounded-lg border border-slate-300">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Perdas / Quebras (R$)</label>
+                            <input type="number" step="0.01" id="val-quebras" required class="w-full px-3 py-2 rounded-lg border border-slate-300">
+                        </div>
+                        <button type="submit" class="py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-semibold transition">
+                            Atualizar Indicadores
+                        </button>
+                    </form>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- MODAL NOVO PRODUTO -->
+    <div id="modal-produto" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 space-y-4">
+            <h3 class="text-lg font-bold text-slate-900 border-b pb-2">Cadastrar Produto na Base Global</h3>
+            <form id="form-produto" onsubmit="salvarProduto(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Código EAN (Barras) *</label>
+                    <input type="text" id="prod-ean" required class="w-full px-3 py-2 rounded-lg border border-slate-300">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Descrição do Produto *</label>
+                    <input type="text" id="prod-nome" required placeholder="Ex: Arroz Tipo 1 5kg" class="w-full px-3 py-2 rounded-lg border border-slate-300">
+                </div>
+                <div class="flex justify-end space-x-2 pt-2 border-t">
+                    <button type="button" onclick="fecharModalProduto()" class="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg text-sm font-semibold">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL ETIQUETAS A4 -->
+    <div id="modal-etiquetas" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col p-6 space-y-4">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h3 class="text-lg font-bold text-slate-900">Pré-visualização de Etiquetas A4 (20 por Folha)</h3>
+                <button onclick="fecharModalEtiquetas()" class="text-slate-500 hover:text-slate-700 font-bold px-2">✕</button>
+            </div>
+            <div id="print-area" class="flex-1 overflow-y-auto grid grid-cols-2 gap-4 p-4 bg-slate-100 rounded-xl border"></div>
+            <div class="flex justify-end gap-2 pt-2 border-t">
+                <button onclick="window.print()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold">
+                    <i class="fa-solid fa-print mr-1"></i> Imprimir Folha A4
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT DA APLICAÇÃO -->
     <script>
-        // Garante que o menu principal abre assim que a página carrega
-        window.onload = function() {
-            if (typeof voltarMenuPrincipal === "function") {
-                voltarMenuPrincipal();
+        let currentUser = null;
+        let produtos = JSON.parse(localStorage.getItem('gondola_produtos')) || [
+            { ean: '7891000100103', nome: 'Uísque Importado 8 Anos 750ml' },
+            { ean: '7891024050012', nome: 'Cerveja Pilsen Lata 350ml' },
+            { ean: '7896003701115', nome: 'Café Torrado e Moído 500g' }
+        ];
+        let entregas = JSON.parse(localStorage.getItem('gondola_entregas')) || [];
+        let checklist = JSON.parse(localStorage.getItem('gondola_checklist')) || [
+            { id: 1, item: 'Organização e limpeza do Hortifrúti', status: 'OK' },
+            { id: 2, item: 'Validade conferida nos Frios e Laticínios', status: 'OK' },
+            { id: 3, item: 'Reposição completa no setor de Mercearia', status: 'Pendente' }
+        ];
+        let dadosFinanceiros = JSON.parse(localStorage.getItem('gondola_fin')) || { vendas: 45800, quebras: 420 };
+
+        document.getElementById('login-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const role = document.getElementById('user-role').value;
+            const name = document.getElementById('user-name').value;
+            currentUser = { role, name };
+            
+            document.getElementById('login-screen').classList.add('hidden-section');
+            document.getElementById('app-container').classList.remove('hidden-section');
+            document.getElementById('header-user-badge').innerText = `Perfil: ${role.toUpperCase()} (${name})`;
+
+            if (role !== 'admin') {
+                document.getElementById('tab-admin-btn').style.display = 'none';
             } else {
-                document.querySelector(".container").innerHTML = "<h3 style='color:red; text-align:center;'>Erro: Função voltarMenuPrincipal não encontrada no script.js</h3>";
+                document.getElementById('tab-admin-btn').style.display = 'block';
             }
-        };
+            renderizarTudo();
+        });
+
+        function logout() { location.reload(); }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden-section'));
+            document.querySelectorAll('.nav-tab').forEach(el => {
+                el.classList.remove('bg-emerald-600', 'text-white');
+                el.classList.add('text-slate-300', 'hover:bg-slate-700');
+            });
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden-section');
+            event.currentTarget.classList.add('bg-emerald-600', 'text-white');
+            event.currentTarget.classList.remove('text-slate-300', 'hover:bg-slate-700');
+        }
+
+        function renderizarTudo() {
+            renderizarProdutos();
+            renderizarEntregas();
+            renderizarChecklist();
+            atualizarDashboard();
+        }
+
+        function renderizarProdutos() {
+            const tbody = document.getElementById('lista-produtos');
+            const filtro = document.getElementById('filtro-produto').value.toLowerCase();
+            tbody.innerHTML = '';
+            const filtrados = produtos.filter(p => p.ean.toLowerCase().includes(filtro) || p.nome.toLowerCase().includes(filtro));
+
+            if (filtrados.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-slate-400">Nenhum produto cadastrado.</td></tr>`;
+                return;
+            }
+            filtrados.forEach((p, index) => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+                        <td class="p-3"><input type="checkbox" class="check-etiqueta" value="${p.ean}"></td>
+                        <td class="p-3 font-mono text-xs text-slate-600">${p.ean}</td>
+                        <td class="p-3 font-medium text-slate-900">${p.nome}</td>
+                        <td class="p-3 text-right">
+                            <button onclick="removerProduto(${index})" class="text-rose-500 hover:text-rose-700 text-xs px-2 py-1"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function filtrarProdutos() { renderizarProdutos(); }
+        function abrirModalProduto() { document.getElementById('modal-produto').classList.remove('hidden'); }
+        function fecharModalProduto() { document.getElementById('modal-produto').classList.add('hidden'); }
+
+        function salvarProduto(e) {
+            e.preventDefault();
+            const ean = document.getElementById('prod-ean').value;
+            const nome = document.getElementById('prod-nome').value;
+            produtos.push({ ean, nome });
+            localStorage.setItem('gondola_produtos', JSON.stringify(produtos));
+            fecharModalProduto();
+            document.getElementById('form-produto').reset();
+            renderizarProdutos();
+        }
+
+        function removerProduto(index) {
+            produtos.splice(index, 1);
+            localStorage.setItem('gondola_produtos', JSON.stringify(produtos));
+            renderizarProdutos();
+        }
+
+        function exportarExcelProdutos() {
+            let csv = "EAN;Descricao\n" + produtos.map(p => `${p.ean};${p.nome}`).join("\n");
+            let blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            let link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "base_global_produtos.csv";
+            link.click();
+        }
+
+        function gerarEtiquetasA4() {
+            const checks = document.querySelectorAll('.check-etiqueta:checked');
+            const printArea = document.getElementById('print-area');
+            printArea.innerHTML = '';
+            if (checks.length === 0) {
+                alert('Selecione pelo menos um produto para gerar etiquetas.');
+                return;
+            }
+            checks.forEach(chk => {
+                const prod = produtos.find(p => p.ean === chk.value);
+                if (prod) {
+                    printArea.innerHTML += `
+                        <div class="border-2 border-dashed border-slate-300 bg-white p-4 rounded-lg flex flex-col justify-between h-32">
+                            <div class="text-xs font-bold text-slate-800 line-clamp-2">${prod.nome}</div>
+                            <div class="text-center font-mono text-lg font-extrabold tracking-wider mt-2">${prod.ean}</div>
+                            <div class="text-[10px] text-slate-400 text-right">Gôndola OK - A4</div>
+                        </div>
+                    `;
+                }
+            });
+            document.getElementById('modal-etiquetas').classList.remove('hidden');
+        }
+
+        function fecharModalEtiquetas() { document.getElementById('modal-etiquetas').classList.add('hidden'); }
+
+        function buscarClienteCadastrado(nome) {
+            if (nome.length < 3) return;
+            const encontrado = entregas.find(e => e.nome.toLowerCase().includes(nome.toLowerCase()));
+            if (encontrado) {
+                document.getElementById('ent-fone').value = encontrado.fone;
+                document.getElementById('ent-cidade').value = encontrado.cidade;
+                document.getElementById('ent-rua').value = encontrado.rua;
+            }
+        }
+
+        function salvarEntrega(e) {
+            e.preventDefault();
+            const novaEntrega = {
+                id: Date.now(),
+                nome: document.getElementById('ent-nome').value,
+                fone: document.getElementById('ent-fone').value,
+                cidade: document.getElementById('ent-cidade').value,
+                rua: document.getElementById('ent-rua').value,
+                volumes: document.getElementById('ent-volumes').value,
+                status: 'Pendente'
+            };
+            entregas.push(novaEntrega);
+            localStorage.setItem('gondola_entregas', JSON.stringify(entregas));
+            document.getElementById('form-entrega').reset();
+            renderizarEntregas();
+            alert('Entrega agendada!');
+        }
+
+        function renderizarEntregas() {
+            const painel = document.getElementById('painel-rotas');
+            painel.innerHTML = '';
+            if (entregas.length === 0) {
+                painel.innerHTML = `<p class="text-sm text-slate-400 text-center py-4">Nenhuma entrega agendada.</p>`;
+                return;
+            }
+            entregas.forEach(ent => {
+                const msgWhats = encodeURIComponent(`Olá ${ent.nome}! Sua encomenda (${ent.volumes}) está em rota de entrega.`);
+                const linkMap = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ent.rua + ', ' + ent.cidade)}`;
+                painel.innerHTML += `
+                    <div class="p-4 rounded-xl border border-slate-200 bg-slate-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div class="space-y-1">
+                            <div class="flex items-center space-x-2">
+                                <span class="font-bold text-slate-900">${ent.nome}</span>
+                                <span class="px-2 py-0.5 text-xs font-semibold rounded-full ${ent.status === 'Entregue' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">${ent.status}</span>
+                            </div>
+                            <p class="text-xs text-slate-600"><i class="fa-solid fa-location-dot mr-1"></i> ${ent.rua} - ${ent.cidade}</p>
+                            <p class="text-xs text-slate-500">Volumes: ${ent.volumes} | Fone: ${ent.fone}</p>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <a href="${linkMap}" target="_blank" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700"><i class="fa-solid fa-map-location-dot mr-1"></i> GPS</a>
+                            <a href="https://wa.me/55${ent.fone.replace(/\D/g,'')}?text=${msgWhats}" target="_blank" onclick="atualizarStatusEntrega(${ent.id}, 'Em Rota')" class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700"><i class="fa-brands fa-whatsapp mr-1"></i> WhatsApp</a>
+                            <button onclick="atualizarStatusEntrega(${ent.id}, 'Entregue')" class="px-3 py-1.5 bg-slate-800 text-white rounded-lg text-xs font-semibold">Concluir</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function atualizarStatusEntrega(id, novoStatus) {
+            const ent = entregas.find(e => e.id === id);
+            if(ent) {
+                ent.status = novoStatus;
+                localStorage.setItem('gondola_entregas', JSON.stringify(entregas));
+                renderizarEntregas();
+            }
+        }
+
+        function exportarEntregasExcel() {
+            let csv = "Cliente;Telefone;Cidade;Rua;Volumes;Status\n" + entregas.map(e => `${e.nome};${e.fone};${e.cidade};${e.rua};${e.volumes};${e.status}`).join("\n");
+            let blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            let link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "entregas.csv";
+            link.click();
+        }
+
+        function iniciarNovoInventario() {
+            const container = document.getElementById('container-inventario');
+            container.innerHTML = `
+                <div class="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-4">
+                    <h4 class="font-bold text-amber-900">Balanço Relâmpago (Prevenção de Perdas)</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <select id="inv-produto" class="px-3 py-2 rounded-lg border bg-white text-sm">
+                            ${produtos.map(p => `<option value="${p.ean}">${p.nome} (${p.ean})</option>`).join('')}
+                        </select>
+                        <input type="number" id="inv-qtd-fisica" placeholder="Qtd Física Contada" class="px-3 py-2 rounded-lg border text-sm">
+                        <button onclick="calcularDivergencia()" class="py-2 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700">Conferir Estoque</button>
+                    </div>
+                    <div id="resultado-inventario" class="pt-2"></div>
+                </div>
+            `;
+        }
+
+        function calcularDivergencia() {
+            const ean = document.getElementById('inv-produto').value;
+            const qtdFisica = parseInt(document.getElementById('inv-qtd-fisica').value) || 0;
+            const prod = produtos.find(p => p.ean === ean);
+            const estoqueSistemico = 10; 
+            const diferenca = qtdFisica - estoqueSistemico;
+            document.getElementById('resultado-inventario').innerHTML = `
+                <div class="p-3 bg-white rounded-lg border text-sm space-y-1">
+                    <p><strong>Produto:</strong> ${prod.nome}</p>
+                    <p><strong>Estoque Teórico:</strong> ${estoqueSistemico} | <strong>Físico:</strong> ${qtdFisica}</p>
+                    <p class="font-bold ${diferenca < 0 ? 'text-rose-600' : diferenca > 0 ? 'text-emerald-600' : 'text-slate-700'}">
+                        Resultado: ${diferenca === 0 ? 'Sem Divergência' : diferenca < 0 ? `Falta de ${Math.abs(diferenca)} unidades` : `Sobra de ${diferenca} unidades`}
+                    </p>
+                </div>
+            `;
+        }
+
+        function renderizarChecklist() {
+            const container = document.getElementById('lista-checklist');
+            container.innerHTML = '';
+            checklist.forEach(item => {
+                container.innerHTML += `
+                    <div class="flex items-center justify-between p-3 rounded-xl border bg-slate-50">
+                        <span class="text-sm font-medium text-slate-800">${item.item}</span>
+                        <select onchange="alterarChecklist(${item.id}, this.value)" class="px-3 py-1.5 rounded-lg border text-xs font-semibold bg-white">
+                            <option value="OK" ${item.status === 'OK' ? 'selected' : ''}>OK</option>
+                            <option value="Pendente" ${item.status === 'Pendente' ? 'selected' : ''}>Pendente</option>
+                        </select>
+                    </div>
+                `;
+            });
+        }
+
+        function alterarChecklist(id, status) {
+            const item = checklist.find(c => c.id === id);
+            if(item) {
+                item.status = status;
+                localStorage.setItem('gondola_checklist', JSON.stringify(checklist));
+            }
+        }
+
+        function exportarChecklistExcel() {
+            let csv = "Item;Status\n" + checklist.map(c => `${c.item};${c.status}`).join("\n");
+            let blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            let link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "checklist.csv";
+            link.click();
+        }
+
+        function salvarFechamentoGerencial(e) {
+            e.preventDefault();
+            dadosFinanceiros.vendas = parseFloat(document.getElementById('val-vendas').value) || 0;
+            dadosFinanceiros.quebras = parseFloat(document.getElementById('val-quebras').value) || 0;
+            localStorage.setItem('gondola_fin', JSON.stringify(dadosFinanceiros));
+            atualizarDashboard();
+            alert('Indicadores atualizados!');
+        }
+
+        function atualizarDashboard() {
+            document.getElementById('dash-vendas').innerText = `R$ ${dadosFinanceiros.vendas.toLocaleString('pt-BR', {minFractionDigits: 2})}`;
+            document.getElementById('dash-quebras').innerText = `R$ ${dadosFinanceiros.quebras.toLocaleString('pt-BR', {minFractionDigits: 2})}`;
+            const aproveitamento = Math.max(0, 100 - ((dadosFinanceiros.quebras / (dadosFinanceiros.vendas || 1)) * 100)).toFixed(1);
+            document.getElementById('dash-indice').innerText = `${aproveitamento}%`;
+        }
     </script>
 </body>
 </html>
